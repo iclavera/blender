@@ -411,6 +411,12 @@ macro(setup_liblinks
 	endif()
 
 	target_link_libraries(${target} ${PLATFORM_LINKLIBS} ${CMAKE_DL_LIBS})
+
+	# We put CLEW and CUEW here because OPENSUBDIV_LIBRARIES dpeends on them..
+	if(WITH_CYCLES OR WITH_COMPOSITOR OR WITH_OPENSUBDIV)
+		target_link_libraries(${target} "extern_clew")
+		target_link_libraries(${target} "extern_cuew")
+	endif()
 endmacro()
 
 macro(SETUP_BLENDER_SORTED_LIBS)
@@ -493,6 +499,7 @@ macro(SETUP_BLENDER_SORTED_LIBS)
 		bf_bmesh
 		bf_blenkernel
 		bf_nodes
+		bf_rna
 		bf_gpu
 		bf_blenloader
 		bf_imbuf
@@ -532,7 +539,6 @@ macro(SETUP_BLENDER_SORTED_LIBS)
 		extern_openjpeg
 		extern_redcode
 		ge_videotex
-		bf_rna
 		bf_dna
 		bf_blenfont
 		bf_intern_audaspace
@@ -787,6 +793,78 @@ macro(TEST_UNORDERED_MAP_SUPPORT)
 			set(UNORDERED_MAP_NAMESPACE "std::tr1")
 		else()
 			message(STATUS "Unable to find <unordered_map> or <tr1/unordered_map>. ")
+		endif()
+	endif()
+endmacro()
+
+macro(TEST_SHARED_PTR_SUPPORT)
+	# This check are coming from Ceres library.
+	#
+	# Find shared pointer header and namespace.
+	#
+	# This module defines the following variables:
+	#
+	# SHARED_PTR_FOUND: TRUE if shared_ptr found.
+	# SHARED_PTR_TR1_MEMORY_HEADER: True if <tr1/memory> header is to be used
+	# for the shared_ptr object, otherwise use <memory>.
+	# SHARED_PTR_TR1_NAMESPACE: TRUE if shared_ptr is defined in std::tr1 namespace,
+	# otherwise it's assumed to be defined in std namespace.
+
+	include(CheckIncludeFileCXX)
+	set(SHARED_PTR_FOUND FALSE)
+	CHECK_INCLUDE_FILE_CXX(memory HAVE_STD_MEMORY_HEADER)
+	if(HAVE_STD_MEMORY_HEADER)
+		# Finding the memory header doesn't mean that shared_ptr is in std
+		# namespace.
+		#
+		# In particular, MSVC 2008 has shared_ptr declared in std::tr1.  In
+		# order to support this, we do an extra check to see which namespace
+		# should be used.
+		include(CheckCXXSourceCompiles)
+		CHECK_CXX_SOURCE_COMPILES("#include <memory>
+		                           int main() {
+		                             std::shared_ptr<int> int_ptr;
+		                             return 0;
+		                           }"
+		                          HAVE_SHARED_PTR_IN_STD_NAMESPACE)
+
+		if(HAVE_SHARED_PTR_IN_STD_NAMESPACE)
+			message("-- Found shared_ptr in std namespace using <memory> header.")
+			set(SHARED_PTR_FOUND TRUE)
+		else()
+			CHECK_CXX_SOURCE_COMPILES("#include <memory>
+			                           int main() {
+			                           std::tr1::shared_ptr<int> int_ptr;
+			                           return 0;
+			                           }"
+			                          HAVE_SHARED_PTR_IN_TR1_NAMESPACE)
+			if(HAVE_SHARED_PTR_IN_TR1_NAMESPACE)
+				message("-- Found shared_ptr in std::tr1 namespace using <memory> header.")
+				set(SHARED_PTR_TR1_NAMESPACE TRUE)
+				set(SHARED_PTR_FOUND TRUE)
+			endif()
+		endif()
+	endif()
+
+	if(NOT SHARED_PTR_FOUND)
+		# Further, gcc defines shared_ptr in std::tr1 namespace and
+		# <tr1/memory> is to be included for this. And what makes things
+		# even more tricky is that gcc does have <memory> header, so
+		# all the checks above wouldn't find shared_ptr.
+		CHECK_INCLUDE_FILE_CXX("tr1/memory" HAVE_TR1_MEMORY_HEADER)
+		if(HAVE_TR1_MEMORY_HEADER)
+			CHECK_CXX_SOURCE_COMPILES("#include <tr1/memory>
+			                           int main() {
+			                           std::tr1::shared_ptr<int> int_ptr;
+			                           return 0;
+			                           }"
+			                           HAVE_SHARED_PTR_IN_TR1_NAMESPACE_FROM_TR1_MEMORY_HEADER)
+			if(HAVE_SHARED_PTR_IN_TR1_NAMESPACE_FROM_TR1_MEMORY_HEADER)
+				message("-- Found shared_ptr in std::tr1 namespace using <tr1/memory> header.")
+				set(SHARED_PTR_TR1_MEMORY_HEADER TRUE)
+				set(SHARED_PTR_TR1_NAMESPACE TRUE)
+				set(SHARED_PTR_FOUND TRUE)
+			endif()
 		endif()
 	endif()
 endmacro()
@@ -1251,4 +1329,55 @@ macro(msgfmt_simple
 	unset(_file_from)
 	unset(_file_to)
 	unset(_file_to_path)
+endmacro()
+
+macro(find_python_package
+      package)
+
+	string(TOUPPER ${package} _upper_package)
+
+	# set but invalid
+	if((NOT ${PYTHON_${_upper_package}_PATH} STREQUAL "") AND
+	   (NOT ${PYTHON_${_upper_package}_PATH} MATCHES NOTFOUND))
+#		if(NOT EXISTS "${PYTHON_${_upper_package}_PATH}/${package}")
+#			message(WARNING "PYTHON_${_upper_package}_PATH is invalid, ${package} not found in '${PYTHON_${_upper_package}_PATH}' "
+#			                "WITH_PYTHON_INSTALL_${_upper_package} option will be ignored when installing python")
+#			set(WITH_PYTHON_INSTALL${_upper_package} OFF)
+#		endif()
+	# not set, so initialize
+	else()
+		string(REPLACE "." ";" _PY_VER_SPLIT "${PYTHON_VERSION}")
+		list(GET _PY_VER_SPLIT 0 _PY_VER_MAJOR)
+
+		# re-cache
+		unset(PYTHON_${_upper_package}_PATH CACHE)
+		find_path(PYTHON_${_upper_package}_PATH
+		  NAMES
+		    ${package}
+		  HINTS
+		    "${PYTHON_LIBPATH}/python${PYTHON_VERSION}/"
+		    "${PYTHON_LIBPATH}/python${_PY_VER_MAJOR}/"
+		  PATH_SUFFIXES
+		    site-packages
+		    dist-packages
+		   NO_DEFAULT_PATH
+		)
+
+		 if(NOT EXISTS "${PYTHON_${_upper_package}_PATH}")
+			message(WARNING "'${package}' path could not be found in:\n"
+			                "'${PYTHON_LIBPATH}/python${PYTHON_VERSION}/site-packages/${package}', "
+			                "'${PYTHON_LIBPATH}/python${_PY_VER_MAJOR}/site-packages/${package}', "
+			                "'${PYTHON_LIBPATH}/python${PYTHON_VERSION}/dist-packages/${package}', "
+			                "'${PYTHON_LIBPATH}/python${_PY_VER_MAJOR}/dist-packages/${package}', "
+			                "WITH_PYTHON_INSTALL_${_upper_package} option will be ignored when installing python")
+			set(WITH_PYTHON_INSTALL_${_upper_package} OFF)
+		else()
+			message(STATUS "${package} found at '${PYTHON_${_upper_package}_PATH}'")
+		endif()
+
+		unset(_PY_VER_SPLIT)
+		unset(_PY_VER_MAJOR)
+	  endif()
+
+	  unset(_upper_package)
 endmacro()

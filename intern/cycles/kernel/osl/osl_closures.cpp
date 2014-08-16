@@ -151,13 +151,13 @@ BSDF_CLOSURE_CLASS_END(MicrofacetBeckmannAniso, microfacet_beckmann_aniso)
 BSDF_CLOSURE_CLASS_BEGIN(MicrofacetGGXRefraction, microfacet_ggx_refraction, microfacet_ggx, LABEL_GLOSSY)
 	CLOSURE_FLOAT3_PARAM(MicrofacetGGXRefractionClosure, sc.N),
 	CLOSURE_FLOAT_PARAM(MicrofacetGGXRefractionClosure, sc.data0),
-	CLOSURE_FLOAT_PARAM(MicrofacetGGXRefractionClosure, sc.data1),
+	CLOSURE_FLOAT_PARAM(MicrofacetGGXRefractionClosure, sc.data2),
 BSDF_CLOSURE_CLASS_END(MicrofacetGGXRefraction, microfacet_ggx_refraction)
 
 BSDF_CLOSURE_CLASS_BEGIN(MicrofacetBeckmannRefraction, microfacet_beckmann_refraction, microfacet_beckmann, LABEL_GLOSSY)
 	CLOSURE_FLOAT3_PARAM(MicrofacetBeckmannRefractionClosure, sc.N),
 	CLOSURE_FLOAT_PARAM(MicrofacetBeckmannRefractionClosure, sc.data0),
-	CLOSURE_FLOAT_PARAM(MicrofacetBeckmannRefractionClosure, sc.data1),
+	CLOSURE_FLOAT_PARAM(MicrofacetBeckmannRefractionClosure, sc.data2),
 BSDF_CLOSURE_CLASS_END(MicrofacetBeckmannRefraction, microfacet_beckmann_refraction)
 
 BSDF_CLOSURE_CLASS_BEGIN(HairReflection, hair_reflection, hair_reflection, LABEL_GLOSSY)
@@ -244,8 +244,6 @@ void OSLShader::register_closures(OSLShadingSystem *ss_)
 		bsdf_diffuse_toon_params(), bsdf_diffuse_toon_prepare);
 	register_closure(ss, "glossy_toon", id++,
 		bsdf_glossy_toon_params(), bsdf_glossy_toon_prepare);
-	register_closure(ss, "specular_toon", id++,
-		bsdf_glossy_toon_params(), bsdf_glossy_toon_prepare);
 	register_closure(ss, "westin_backscatter", id++,
 		bsdf_westin_backscatter_params(), bsdf_westin_backscatter_prepare);
 	register_closure(ss, "westin_sheen", id++,
@@ -267,10 +265,6 @@ void OSLShader::register_closures(OSLShadingSystem *ss_)
 		closure_bssrdf_cubic_params(), closure_bssrdf_cubic_prepare);
 	register_closure(ss, "bssrdf_gaussian", id++,
 		closure_bssrdf_gaussian_params(), closure_bssrdf_gaussian_prepare);
-	register_closure(ss, "bssrdf_cubic", id++,
-		closure_bssrdf_cubic_extended_params(), closure_bssrdf_cubic_prepare);
-	register_closure(ss, "bssrdf_gaussian", id++,
-		closure_bssrdf_gaussian_extended_params(), closure_bssrdf_gaussian_prepare);
 
 	register_closure(ss, "hair_reflection", id++,
 		bsdf_hair_reflection_params(), bsdf_hair_reflection_prepare);

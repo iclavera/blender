@@ -181,7 +181,7 @@ static void node_buts_time(uiLayout *layout, bContext *UNUSED(C), PointerRNA *pt
 	}
 #endif
 
-	uiTemplateCurveMapping(layout, ptr, "curve", 's', 0, 0);
+	uiTemplateCurveMapping(layout, ptr, "curve", 's', false, false, false);
 
 	row = uiLayoutRow(layout, true);
 	uiItemR(row, ptr, "frame_start", 0, IFACE_("Sta"), ICON_NONE);
@@ -195,7 +195,7 @@ static void node_buts_colorramp(uiLayout *layout, bContext *UNUSED(C), PointerRN
 
 static void node_buts_curvevec(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-	uiTemplateCurveMapping(layout, ptr, "mapping", 'v', 0, 0);
+	uiTemplateCurveMapping(layout, ptr, "mapping", 'v', false, false, false);
 }
 
 #define SAMPLE_FLT_ISNONE FLT_MAX
@@ -223,7 +223,7 @@ static void node_buts_curvecol(uiLayout *layout, bContext *UNUSED(C), PointerRNA
 		cumap->flag &= ~CUMA_DRAW_SAMPLE;
 	}
 
-	uiTemplateCurveMapping(layout, ptr, "mapping", 'c', 0, 0);
+	uiTemplateCurveMapping(layout, ptr, "mapping", 'c', false, false, false);
 }
 
 static void node_buts_normal(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -885,6 +885,11 @@ static void node_shader_buts_uvmap(uiLayout *layout, bContext *C, PointerRNA *pt
 	}
 }
 
+static void node_shader_buts_uvalongstroke(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+	uiItemR(layout, ptr, "use_tips", 0, NULL, 0);
+}
+
 static void node_shader_buts_normal_map(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
 	uiItemR(layout, ptr, "space", 0, "", 0);
@@ -998,6 +1003,16 @@ static void node_shader_buts_script_ex(uiLayout *layout, bContext *C, PointerRNA
 	if (RNA_enum_get(ptr, "mode") == NODE_SCRIPT_EXTERNAL)
 		uiItemR(layout, ptr, "use_auto_update", 0, NULL, ICON_NONE);
 #endif
+}
+
+static void node_buts_output_linestyle(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+	uiLayout *row, *col;
+
+	col = uiLayoutColumn(layout, false);
+	row = uiLayoutRow(col, true);
+	uiItemR(row, ptr, "blend_type", 0, "", ICON_NONE);
+	uiItemR(col, ptr, "use_clamp", 0, NULL, ICON_NONE);
 }
 
 /* only once called */
@@ -1125,6 +1140,12 @@ static void node_shader_set_butfunc(bNodeType *ntype)
 			break;
 		case SH_NODE_UVMAP:
 			ntype->draw_buttons = node_shader_buts_uvmap;
+			break;
+		case SH_NODE_UVALONGSTROKE:
+			ntype->draw_buttons = node_shader_buts_uvalongstroke;
+			break;
+		case SH_NODE_OUTPUT_LINESTYLE:
+			ntype->draw_buttons = node_buts_output_linestyle;
 			break;
 	}
 }
@@ -1841,7 +1862,7 @@ static void node_composit_buts_huecorrect(uiLayout *layout, bContext *UNUSED(C),
 		cumap->flag &= ~CUMA_DRAW_SAMPLE;
 	}
 
-	uiTemplateCurveMapping(layout, ptr, "mapping", 'h', 0, 0);
+	uiTemplateCurveMapping(layout, ptr, "mapping", 'h', false, false, false);
 }
 
 static void node_composit_buts_ycc(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -2307,6 +2328,12 @@ static void node_composit_buts_cornerpin(uiLayout *UNUSED(layout), bContext *UNU
 {
 }
 
+static void node_composit_buts_sunbeams(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+	uiItemR(layout, ptr, "source", UI_ITEM_R_EXPAND, "", ICON_NONE);
+	uiItemR(layout, ptr, "ray_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
+}
+
 /* only once called */
 static void node_composit_set_butfunc(bNodeType *ntype)
 {
@@ -2530,6 +2557,9 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 			break;
 		case CMP_NODE_CORNERPIN:
 			ntype->draw_buttons = node_composit_buts_cornerpin;
+			break;
+		case CMP_NODE_SUNBEAMS:
+			ntype->draw_buttons = node_composit_buts_sunbeams;
 			break;
 	}
 }
@@ -3122,20 +3152,17 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 			}
 			
 			if ((snode->nodetree->flag & NTREE_VIEWER_BORDER) &&
-			        viewer_border->xmin < viewer_border->xmax &&
-			        viewer_border->ymin < viewer_border->ymax)
+			    viewer_border->xmin < viewer_border->xmax &&
+			    viewer_border->ymin < viewer_border->ymax)
 			{
-				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-				setlinestyle(3);
-				cpack(0x4040FF);
-				
-				glRectf(x + snode->zoom * viewer_border->xmin * ibuf->x,
-				        y + snode->zoom * viewer_border->ymin * ibuf->y,
-				        x + snode->zoom * viewer_border->xmax * ibuf->x,
-				        y + snode->zoom * viewer_border->ymax * ibuf->y);
-				
-				setlinestyle(0);
-				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+				rcti pixel_border;
+				UI_ThemeColor(TH_ACTIVE);
+				BLI_rcti_init(&pixel_border,
+				              x + snode->zoom * viewer_border->xmin * ibuf->x,
+				              x + snode->zoom * viewer_border->xmax * ibuf->x,
+				              y + snode->zoom * viewer_border->ymin * ibuf->y,
+				              y + snode->zoom * viewer_border->ymax * ibuf->y);
+				glaDrawBorderCorners(&pixel_border, 1.0f, 1.0f);
 			}
 		}
 		

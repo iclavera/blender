@@ -86,6 +86,7 @@
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
+#include "GPU_select.h"
 
 #include "ED_mesh.h"
 #include "ED_particle.h"
@@ -109,7 +110,7 @@
  *
  * Ideally we don't want to evaluate objects from drawing,
  * but it'll require some major sequencer re-design. So
- * for now just fallback to legacy behaior with calling
+ * for now just fallback to legacy behavior with calling
  * display ist creating from draw().
  */
 #define SEQUENCER_DAG_WORKAROUND
@@ -301,7 +302,7 @@ bool draw_glsl_material(Scene *scene, Object *ob, View3D *v3d, const char dt)
 	if (BKE_scene_use_new_shading_nodes(scene))
 		return false;
 	
-	return (scene->gm.matmode == GAME_MAT_GLSL) && (dt > OB_SOLID);
+	return ((scene->gm.matmode == GAME_MAT_GLSL) || (v3d->drawtype == OB_MATERIAL)) && (dt > OB_SOLID);
 }
 
 static bool check_alpha_pass(Base *base)
@@ -1586,7 +1587,7 @@ static void draw_viewport_object_reconstruction(Scene *scene, Base *base, View3D
 			continue;
 
 		if (dflag & DRAW_PICKING)
-			glLoadName(base->selcol + (tracknr << 16));
+			GPU_select_load_id(base->selcol + (tracknr << 16));
 
 		glPushMatrix();
 		glTranslatef(track->bundle_pos[0], track->bundle_pos[1], track->bundle_pos[2]);
@@ -1737,7 +1738,7 @@ static void draw_viewport_reconstruction(Scene *scene, Base *base, View3D *v3d, 
 	}
 
 	if (dflag & DRAW_PICKING)
-		glLoadName(base->selcol);
+		GPU_select_load_id(base->selcol);
 }
 
 /* flag similar to draw_object() */
@@ -4868,7 +4869,7 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 		normalize_v3(imat[1]);
 	}
 
-	if (ELEM3(draw_as, PART_DRAW_DOT, PART_DRAW_CROSS, PART_DRAW_LINE) &&
+	if (ELEM(draw_as, PART_DRAW_DOT, PART_DRAW_CROSS, PART_DRAW_LINE) &&
 	    (part->draw_col > PART_DRAW_COL_MAT))
 	{
 		create_cdata = 1;
@@ -6479,7 +6480,7 @@ static bool drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 			
 			if (G.f & G_PICKSEL) {
 				ml->selcol1 = code;
-				glLoadName(code++);
+				GPU_select_load_id(code++);
 			}
 		}
 		drawcircball(GL_LINE_LOOP, &(ml->x), ml->rad, imat);
@@ -6493,7 +6494,7 @@ static bool drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 			
 			if (G.f & G_PICKSEL) {
 				ml->selcol2 = code;
-				glLoadName(code++);
+				GPU_select_load_id(code++);
 			}
 			drawcircball(GL_LINE_LOOP, &(ml->x), ml->rad * atanf(ml->s) / (float)M_PI_2, imat);
 		}
@@ -6699,28 +6700,6 @@ static void draw_box(float vec[8][3])
 	glEnd();
 }
 
-/* uses boundbox, function used by Ketsji */
-#if 0
-static void get_local_bounds(Object *ob, float center[3], float size[3])
-{
-	BoundBox *bb = BKE_object_boundbox_get(ob);
-	
-	if (bb == NULL) {
-		zero_v3(center);
-		copy_v3_v3(size, ob->size);
-	}
-	else {
-		size[0] = 0.5 * fabsf(bb->vec[0][0] - bb->vec[4][0]);
-		size[1] = 0.5 * fabsf(bb->vec[0][1] - bb->vec[2][1]);
-		size[2] = 0.5 * fabsf(bb->vec[0][2] - bb->vec[1][2]);
-
-		center[0] = (bb->vec[0][0] + bb->vec[4][0]) / 2.0;
-		center[1] = (bb->vec[0][1] + bb->vec[2][1]) / 2.0;
-		center[2] = (bb->vec[0][2] + bb->vec[1][2]) / 2.0;
-	}
-}
-#endif
-
 static void draw_bb_quadric(BoundBox *bb, char type, bool around_origin)
 {
 	float size[3], cent[3];
@@ -6728,17 +6707,13 @@ static void draw_bb_quadric(BoundBox *bb, char type, bool around_origin)
 	
 	gluQuadricDrawStyle(qobj, GLU_SILHOUETTE);
 	
-	size[0] = 0.5f * fabsf(bb->vec[0][0] - bb->vec[4][0]);
-	size[1] = 0.5f * fabsf(bb->vec[0][1] - bb->vec[2][1]);
-	size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
+	BKE_boundbox_calc_size_aabb(bb, size);
 
 	if (around_origin) {
 		zero_v3(cent);
 	}
 	else {
-		cent[0] = 0.5f * (bb->vec[0][0] + bb->vec[4][0]);
-		cent[1] = 0.5f * (bb->vec[0][1] + bb->vec[2][1]);
-		cent[2] = 0.5f * (bb->vec[0][2] + bb->vec[1][2]);
+		BKE_boundbox_calc_center_aabb(bb, cent);
 	}
 	
 	glPushMatrix();
@@ -6782,7 +6757,7 @@ static void draw_bounding_volume(Object *ob, char type)
 	if (ob->type == OB_MESH) {
 		bb = BKE_mesh_boundbox_get(ob);
 	}
-	else if (ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
+	else if (ELEM(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
 		bb = BKE_curve_boundbox_get(ob);
 	}
 	else if (ob->type == OB_MBALL) {
@@ -6807,9 +6782,7 @@ static void draw_bounding_volume(Object *ob, char type)
 		if (type == OB_BOUND_BOX) {
 			float vec[8][3], size[3];
 			
-			size[0] = 0.5f * fabsf(bb->vec[0][0] - bb->vec[4][0]);
-			size[1] = 0.5f * fabsf(bb->vec[0][1] - bb->vec[2][1]);
-			size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
+			BKE_boundbox_calc_size_aabb(bb, size);
 			
 			vec[0][0] = vec[1][0] = vec[2][0] = vec[3][0] = -size[0];
 			vec[4][0] = vec[5][0] = vec[6][0] = vec[7][0] = +size[0];
@@ -6839,7 +6812,7 @@ static void drawtexspace(Object *ob)
 	if (ob->type == OB_MESH) {
 		BKE_mesh_texspace_get(ob->data, loc, NULL, size);
 	}
-	else if (ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
+	else if (ELEM(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
 		BKE_curve_texspace_get(ob->data, loc, NULL, size);
 	}
 	else if (ob->type == OB_MBALL) {
@@ -6877,7 +6850,7 @@ static void drawObjectSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
 	glLineWidth(UI_GetThemeValuef(TH_OUTLINE_WIDTH) * 2.0f);
 	glDepthMask(0);
 	
-	if (ELEM3(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
+	if (ELEM(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
 		DerivedMesh *dm = ob->derivedFinal;
 		bool has_faces = false;
 
@@ -6921,7 +6894,7 @@ static void drawObjectSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
 
 static void draw_wire_extra(Scene *scene, RegionView3D *rv3d, Object *ob, const unsigned char ob_wire_col[4])
 {
-	if (ELEM4(ob->type, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL)) {
+	if (ELEM(ob->type, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL)) {
 
 		if (scene->obedit == ob) {
 			UI_ThemeColor(TH_WIRE_EDIT);
@@ -6933,7 +6906,7 @@ static void draw_wire_extra(Scene *scene, RegionView3D *rv3d, Object *ob, const 
 		ED_view3d_polygon_offset(rv3d, 1.0);
 		glDepthMask(0);  /* disable write in zbuffer, selected edge wires show better */
 
-		if (ELEM3(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
+		if (ELEM(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
 			if (ED_view3d_boundbox_clip(rv3d, ob->bb)) {
 
 				if (ob->derivedFinal) {
@@ -7124,9 +7097,7 @@ static void draw_rigidbody_shape(Object *ob)
 
 	switch (ob->rigidbody_object->shape) {
 		case RB_SHAPE_BOX:
-			size[0] = 0.5f * fabsf(bb->vec[0][0] - bb->vec[4][0]);
-			size[1] = 0.5f * fabsf(bb->vec[0][1] - bb->vec[2][1]);
-			size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
+			BKE_boundbox_calc_size_aabb(bb, size);
 			
 			vec[0][0] = vec[1][0] = vec[2][0] = vec[3][0] = -size[0];
 			vec[4][0] = vec[5][0] = vec[6][0] = vec[7][0] = +size[0];
@@ -7171,20 +7142,23 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	const bool is_obact = (ob == OBACT);
 	const bool render_override = (v3d->flag2 & V3D_RENDER_OVERRIDE) != 0;
 	const bool is_picking = (G.f & G_PICKSEL) != 0;
+	const bool has_particles = (ob->particlesystem.first != NULL);
 	bool particle_skip_object = false;  /* Draw particles but not their emitter object. */
 
 	if (ob != scene->obedit) {
-		if (ob->restrictflag & OB_RESTRICT_VIEW) {
+		if (ob->restrictflag & OB_RESTRICT_VIEW)
 			return;
-		}
-		else if (render_override && ((ob->restrictflag & OB_RESTRICT_RENDER) ||
-		                             (ob->transflag & OB_DUPLI)))
-		{
-			return;
+		
+		if (render_override) {
+			if (ob->restrictflag & OB_RESTRICT_RENDER)
+				return;
+			
+			if (!has_particles && (ob->transflag & (OB_DUPLI & ~OB_DUPLIFRAMES)))
+				return;
 		}
 	}
 
-	if (ob->particlesystem.first) {
+	if (has_particles) {
 		/* XXX particles are not safe for simultaneous threaded render */
 		if (G.is_rendering) {
 			return;

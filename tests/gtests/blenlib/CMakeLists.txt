@@ -23,8 +23,9 @@
 
 set(INC
 	.
-	../
+	..
 	../../../source/blender/blenlib
+	../../../source/blender/makesdna
 	../../../intern/guardedalloc
 )
 
@@ -34,6 +35,9 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${PLATFORM_LINKFLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} ${PLATFORM_LINKFLAGS_DEBUG}")
 
 
+BLENDER_TEST(BLI_stack "bf_blenlib")
 BLENDER_TEST(BLI_math_color "bf_blenlib")
 BLENDER_TEST(BLI_math_geom "bf_blenlib")
+BLENDER_TEST(BLI_string "bf_blenlib")
 BLENDER_TEST(BLI_path_util "bf_blenlib;extern_wcwidth;${ZLIB_LIBRARIES}")
+BLENDER_TEST(BLI_listbase "bf_blenlib")

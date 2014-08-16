@@ -118,13 +118,13 @@ static void bm_face_bisect_verts(BMesh *bm, BMFace *f, const float plane[4], con
 	BMLoop *l_iter, *l_first;
 	bool use_dirs[3] = {false, false, false};
 
-	STACK_INIT(vert_split_arr);
+	STACK_INIT(vert_split_arr, f_len_orig);
 
 	l_first = BM_FACE_FIRST_LOOP(f);
 
 	/* add plane-aligned verts to the stack
 	 * and check we have verts from both sides in this face,
-	 * ... that the face doesn't only have boundry verts on the plane for eg. */
+	 * ... that the face doesn't only have boundary verts on the plane for eg. */
 	l_iter = l_first;
 	do {
 		if (vert_is_center_test(l_iter->v)) {
@@ -224,7 +224,7 @@ static void bm_face_bisect_verts(BMesh *bm, BMFace *f, const float plane[4], con
 			 * while not all that nice, typically there are < 5 resulting faces,
 			 * so its not _that_ bad. */
 
-			STACK_INIT(face_split_arr);
+			STACK_INIT(face_split_arr, STACK_SIZE(vert_split_arr));
 			STACK_PUSH(face_split_arr, f);
 
 			for (i = 0; i < STACK_SIZE(vert_split_arr) - 1; i++) {

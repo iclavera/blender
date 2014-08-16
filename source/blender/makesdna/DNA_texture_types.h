@@ -111,9 +111,12 @@ typedef struct CBData {
 /* 32 = MAXCOLORBAND */
 /* note that this has to remain a single struct, for UserDef */
 typedef struct ColorBand {
-	short flag, tot, cur, ipotype;
+	short tot, cur;
+	char ipotype, ipotype_hue;
+	char color_mode;
+	char pad[1];
+
 	CBData data[32];
-	
 } ColorBand;
 
 typedef struct EnvMap {
@@ -510,6 +513,32 @@ typedef struct ColorMapping {
 #define MTEX_MAP_MODE_RANDOM   4
 #define MTEX_MAP_MODE_STENCIL  5
 
+/* **************** ColorBand ********************* */
+
+/* colormode */
+enum {
+	COLBAND_BLEND_RGB   = 0,
+	COLBAND_BLEND_HSV   = 1,
+	COLBAND_BLEND_HSL   = 2,
+};
+
+/* interpolation */
+enum {
+	COLBAND_INTERP_LINEAR       = 0,
+	COLBAND_INTERP_EASE         = 1,
+	COLBAND_INTERP_B_SPLINE     = 2,
+	COLBAND_INTERP_CARDINAL     = 3,
+	COLBAND_INTERP_CONSTANT     = 4,
+};
+
+/* color interpolation */
+enum {
+	COLBAND_HUE_NEAR    = 0,
+	COLBAND_HUE_FAR     = 1,
+	COLBAND_HUE_CW      = 2,
+	COLBAND_HUE_CCW     = 3,
+};
+
 /* **************** EnvMap ********************* */
 
 /* type */
@@ -585,7 +614,7 @@ typedef struct ColorMapping {
 #define TEX_VD_IMAGE_SEQUENCE	3
 #define TEX_VD_SMOKE			4
 /* for voxels which use VoxelData->source_path */
-#define TEX_VD_IS_SOURCE_PATH(_format) (ELEM3(_format, TEX_VD_BLENDERVOXEL, TEX_VD_RAW_8BIT, TEX_VD_RAW_16BIT))
+#define TEX_VD_IS_SOURCE_PATH(_format) (ELEM(_format, TEX_VD_BLENDERVOXEL, TEX_VD_RAW_8BIT, TEX_VD_RAW_16BIT))
 
 /* smoke data types */
 #define TEX_VD_SMOKEDENSITY		0

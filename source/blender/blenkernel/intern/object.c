@@ -246,7 +246,7 @@ void BKE_object_link_modifiers(struct Object *ob_dst, struct Object *ob_src)
 	ModifierData *md;
 	BKE_object_free_modifiers(ob_dst);
 
-	if (!ELEM5(ob_dst->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_LATTICE)) {
+	if (!ELEM(ob_dst->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_LATTICE)) {
 		/* only objects listed above can have modifiers and linking them to objects
 		 * which doesn't have modifiers stack is quite silly */
 		return;
@@ -255,11 +255,11 @@ void BKE_object_link_modifiers(struct Object *ob_dst, struct Object *ob_src)
 	for (md = ob_src->modifiers.first; md; md = md->next) {
 		ModifierData *nmd = NULL;
 
-		if (ELEM4(md->type,
-		          eModifierType_Hook,
-		          eModifierType_Softbody,
-		          eModifierType_ParticleInstance,
-		          eModifierType_Collision))
+		if (ELEM(md->type,
+		         eModifierType_Hook,
+		         eModifierType_Softbody,
+		         eModifierType_ParticleInstance,
+		         eModifierType_Collision))
 		{
 			continue;
 		}
@@ -296,7 +296,7 @@ void BKE_object_free_derived_caches(Object *ob)
 			me->bb->flag |= BOUNDBOX_DIRTY;
 		}
 	}
-	else if (ELEM3(ob->type, OB_SURF, OB_CURVE, OB_FONT)) {
+	else if (ELEM(ob->type, OB_SURF, OB_CURVE, OB_FONT)) {
 		Curve *cu = ob->data;
 
 		if (cu->bb) {
@@ -709,7 +709,7 @@ void BKE_object_unlink(Object *ob)
 				     lineset; lineset = lineset->next)
 				{
 					if (lineset->linestyle) {
-						BKE_unlink_linestyle_target_object(lineset->linestyle, ob);
+						BKE_linestyle_target_object_unlink(lineset->linestyle, ob);
 					}
 				}
 			}
@@ -977,7 +977,7 @@ Object *BKE_object_add_only_object(Main *bmain, int type, const char *name)
 	ob->empty_drawtype = OB_PLAINAXES;
 	ob->empty_drawsize = 1.0;
 
-	if (ELEM3(type, OB_LAMP, OB_CAMERA, OB_SPEAKER)) {
+	if (ELEM(type, OB_LAMP, OB_CAMERA, OB_SPEAKER)) {
 		ob->trackflag = OB_NEGZ;
 		ob->upflag = OB_POSY;
 	}
@@ -1978,7 +1978,7 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[4][4])
 	unit_m4(mat);
 	
 	cu = par->data;
-	if (ELEM3(NULL, par->curve_cache, par->curve_cache->path, par->curve_cache->path->data)) /* only happens on reload file, but violates depsgraph still... fix! */
+	if (ELEM(NULL, par->curve_cache, par->curve_cache->path, par->curve_cache->path->data)) /* only happens on reload file, but violates depsgraph still... fix! */
 		BKE_displist_make_curveTypes(scene, par, 0);
 	if (par->curve_cache->path == NULL) return;
 	
@@ -1994,17 +1994,20 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[4][4])
 		 * we divide the curvetime calculated in the previous step by the length of the path, to get a time
 		 * factor, which then gets clamped to lie within 0.0 - 1.0 range
 		 */
-		if (IS_EQF(cu->pathlen, 0.0f) == 0)
+		if (cu->pathlen) {
 			ctime = cu->ctime / cu->pathlen;
-		else
+		}
+		else {
 			ctime = cu->ctime;
+		}
 
 		CLAMP(ctime, 0.0f, 1.0f);
 	}
 	else {
 		ctime = BKE_scene_frame_get(scene);
-		if (IS_EQF(cu->pathlen, 0.0f) == 0)
+		if (cu->pathlen) {
 			ctime /= cu->pathlen;
+		}
 		
 		CLAMP(ctime, 0.0f, 1.0f);
 	}
@@ -2466,6 +2469,20 @@ void BKE_boundbox_init_from_minmax(BoundBox *bb, const float min[3], const float
 	bb->vec[1][2] = bb->vec[2][2] = bb->vec[5][2] = bb->vec[6][2] = max[2];
 }
 
+void BKE_boundbox_calc_center_aabb(const BoundBox *bb, float r_cent[3])
+{
+	r_cent[0] = 0.5f * (bb->vec[0][0] + bb->vec[4][0]);
+	r_cent[1] = 0.5f * (bb->vec[0][1] + bb->vec[2][1]);
+	r_cent[2] = 0.5f * (bb->vec[0][2] + bb->vec[1][2]);
+}
+
+void BKE_boundbox_calc_size_aabb(const BoundBox *bb, float r_size[3])
+{
+	r_size[0] = 0.5f * fabsf(bb->vec[0][0] - bb->vec[4][0]);
+	r_size[1] = 0.5f * fabsf(bb->vec[0][1] - bb->vec[2][1]);
+	r_size[2] = 0.5f * fabsf(bb->vec[0][2] - bb->vec[1][2]);
+}
+
 BoundBox *BKE_object_boundbox_get(Object *ob)
 {
 	BoundBox *bb = NULL;
@@ -2473,7 +2490,7 @@ BoundBox *BKE_object_boundbox_get(Object *ob)
 	if (ob->type == OB_MESH) {
 		bb = BKE_mesh_boundbox_get(ob);
 	}
-	else if (ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
+	else if (ELEM(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
 		bb = BKE_curve_boundbox_get(ob);
 	}
 	else if (ob->type == OB_MBALL) {
@@ -2483,7 +2500,7 @@ BoundBox *BKE_object_boundbox_get(Object *ob)
 }
 
 /* used to temporally disable/enable boundbox */
-void BKE_object_boundbox_flag(Object *ob, int flag, int set)
+void BKE_object_boundbox_flag(Object *ob, int flag, const bool set)
 {
 	BoundBox *bb = BKE_object_boundbox_get(ob);
 	if (bb) {
@@ -2909,7 +2926,7 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
 					uint64_t data_mask = scene->customdata_mask | CD_MASK_BAREMESH;
 #ifdef WITH_FREESTYLE
 					/* make sure Freestyle edge/face marks appear in DM for render (see T40315) */
-					if (eval_ctx->for_render) {
+					if (eval_ctx->mode != DAG_EVAL_VIEWPORT) {
 						data_mask |= CD_MASK_FREESTYLE_EDGE | CD_MASK_FREESTYLE_FACE;
 					}
 #endif
@@ -2989,7 +3006,7 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
 
 					if (psys_check_enabled(ob, psys)) {
 						/* check use of dupli objects here */
-						if (psys->part && (psys->part->draw_as == PART_DRAW_REND || eval_ctx->for_render) &&
+						if (psys->part && (psys->part->draw_as == PART_DRAW_REND || eval_ctx->mode == DAG_EVAL_RENDER) &&
 						    ((psys->part->ren_as == PART_DRAW_OB && psys->part->dup_ob) ||
 						     (psys->part->ren_as == PART_DRAW_GR && psys->part->dup_group)))
 						{
@@ -3009,7 +3026,7 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
 						psys = psys->next;
 				}
 
-				if (eval_ctx->for_render && ob->transflag & OB_DUPLIPARTS) {
+				if (eval_ctx->mode == DAG_EVAL_RENDER && ob->transflag & OB_DUPLIPARTS) {
 					/* this is to make sure we get render level duplis in groups:
 					 * the derivedmesh must be created before init_render_mesh,
 					 * since object_duplilist does dupliparticles before that */
@@ -3126,8 +3143,10 @@ int BKE_object_obdata_texspace_get(Object *ob, short **r_texflag, float **r_loc,
  * Test a bounding box for ray intersection
  * assumes the ray is already local to the boundbox space
  */
-bool BKE_boundbox_ray_hit_check(struct BoundBox *bb, const float ray_start[3], const float ray_normal[3],
-                                float *r_lambda)
+bool BKE_boundbox_ray_hit_check(
+        const struct BoundBox *bb,
+        const float ray_start[3], const float ray_normal[3],
+        float *r_lambda)
 {
 	const int triangle_indexes[12][3] = {
 	    {0, 1, 2}, {0, 2, 3},
