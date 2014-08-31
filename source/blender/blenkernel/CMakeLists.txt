@@ -85,6 +85,7 @@ set(SRC
 	intern/deform.c
 	intern/depsgraph.c
 	intern/displist.c
+    intern/dsort.c
 	intern/dynamicpaint.c
 	intern/editderivedmesh.c
 	intern/editmesh.c
@@ -199,6 +200,7 @@ set(SRC
 	BKE_deform.h
 	BKE_depsgraph.h
 	BKE_displist.h
+    BKE_dsort.h
 	BKE_dynamicpaint.h
 	BKE_effect.h
 	BKE_fcurve.h
