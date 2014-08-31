@@ -706,6 +706,10 @@ static DerivedMesh *applyModifier(
 			mp->loopstart = (int)(j + numLoops * 2);
 			mp->flag = mpoly[fidx].flag;
 
+			/* if keeping normals then make side faces flat */
+			if (smd->flag & MOD_SOLIDIFY_KEEP_NORMALS)
+				mp->flag &= ~ME_SMOOTH;
+
 			/* notice we use 'mp->totloop' which is later overwritten,
 			 * we could lookup the original face but theres no point since this is a copy
 			 * and will have the same value, just take care when changing order of assignment */
@@ -783,7 +787,8 @@ static DerivedMesh *applyModifier(
 		}
 
 #ifdef SOLIDIFY_SIDE_NORMALS
-		if (do_side_normals) {
+		/* don't recalculate normals when keeping normals */
+		if (do_side_normals  && !(smd->flag & MOD_SOLIDIFY_KEEP_NORMALS)) {
 			ed = medge + (numEdges * 2);
 			for (i = 0; i < newEdges; i++, ed++) {
 				float nor_cpy[3];
@@ -825,6 +830,18 @@ static DerivedMesh *applyModifier(
 	if (numFaces == 0 && numEdges != 0) {
 		modifier_setError(md, "Faces needed for useful output");
 	}
+
+	/* if keeping normals then flip new verts normals */
+	if (smd->flag & MOD_SOLIDIFY_KEEP_NORMALS) {
+		for (i = 0; i < numVerts; i++) {
+			copy_v3_v3_short(mvert[i + numVerts].no, mvert[i].no);
+			negate_v3_short(mvert[i + numVerts].no);
+		}
+	}
+
+	/* prevent normals from recalculating when using keep normals? */
+	if (smd->flag & MOD_SOLIDIFY_KEEP_NORMALS)
+		result->dirty = 0;
 
 	return result;
 }
