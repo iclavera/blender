@@ -63,7 +63,7 @@ typedef struct DSortSettings {
 	int sort_elems;
 
 	int pad2;
-}DSortSettings;
+} DSortSettings;
 
 enum {
 	DSORT_TYPE_AXIS  = 1,
