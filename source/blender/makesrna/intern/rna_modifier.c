@@ -245,7 +245,7 @@ static StructRNA *rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_LaplacianDeformModifier;
 		case eModifierType_Wireframe:
 			return &RNA_WireframeModifier;
-        case eModifierType_SortModifier:
+        case eModifierType_Sort:
 			return &RNA_SortModifier;
 		/* Default */
 		case eModifierType_None:
