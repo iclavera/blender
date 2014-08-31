@@ -29,7 +29,6 @@
  */
 
 #include "DNA_meshdata_types.h"
-#include "DNA_dsort_types.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -47,6 +46,7 @@
 #include "MOD_modifiertypes.h"
 #include "MOD_util.h"
 
+#include "DNA_dsort_types.h"
 #include "BKE_dsort.h"
 
 static void SortModifier_initDSortSettings(DSortSettings *dss)
@@ -75,6 +75,7 @@ static void SortModifier_initDSortSettings(DSortSettings *dss)
 
 static void initData(ModifierData *md)
 {
+	printf("Jej.\n");
 	SortModifierData *smd = (SortModifierData *) md;
 
 	smd->settings = MEM_callocN(sizeof(DSortSettings), "SortModifier settings");
@@ -89,8 +90,7 @@ static void initData(ModifierData *md)
 	smd->edges_length = 0;
 	smd->verts_length = 0;
 
-	/* for UI */
-	smd->is_sorted = false;
+	smd->is_sorted = false; /* for UI */
 	smd->initiate_sort = true;
 
 	smd->auto_refresh = false;
@@ -114,7 +114,6 @@ static void copyData(ModifierData *md, ModifierData *target)
 {
 	SortModifierData *smd = (SortModifierData *) md;
 	SortModifierData *tsmd = (SortModifierData *) target;
-	int i;
 
 	BKE_copy_dsort_settings(smd->settings, tsmd->settings);
 
@@ -167,6 +166,8 @@ static DerivedMesh *SortModifier_do(ModifierData *md, Object *ob, DerivedMesh *d
 	smd = (SortModifierData *)md;
 
 	bm = DM_to_bmesh(dm, false);
+
+	printf("Test: %d\n", &smd->initiate_sort);
 
 	if (!BKE_dsort_bm(md, bm, smd->settings,
 				&smd->verts_order, &smd->edges_order, &smd->faces_order,

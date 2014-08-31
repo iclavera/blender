@@ -849,10 +849,12 @@ void BKE_dsort_free_data(DSortSettings *settings,
 }
 
 char BKE_dsort_bm(ModifierData *md, BMesh *bm, DSortSettings *settings,
-			int **p_verts_order, int **p_edges_order, int **p_faces_order, int **p_loops_order,
-			int *p_verts_length, int *p_edges_length, int *p_faces_length, int *p_loops_length,
-			short *is_sorted, short *initiate_sort, short auto_refresh)
+					int **p_verts_order, int **p_edges_order, int **p_faces_order, int **p_loops_order,
+					int *p_verts_length, int *p_edges_length, int *p_faces_length, int *p_loops_length,
+					short *is_sorted, short *initiate_sort, short auto_refresh)
 {
+	printf("%d\n", initiate_sort);
+
 	char order_changed = false;
 
 	int *verts_order = p_verts_order ? *p_verts_order : NULL;
