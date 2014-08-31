@@ -45,8 +45,8 @@ void BKE_dsort_free_elems_order(int **verts_order, int **edges_order, int **face
 void BKE_dsort_free_data( struct DSortSettings *settings, int **verts_order, int **edges_order, int **faces_order, short *is_sorted, short *initiate_sort);
 
 char BKE_dsort_bm(struct ModifierData *md, struct BMesh *bm, struct DSortSettings *settings,
-			int **verts_order, int **edges_order, int **faces_order,
-			int *verts_length, int *edges_length, int *faces_length, int *loops_length,
+			int **p_verts_order, int **p_edges_order, int **p_faces_order,
+			int *p_verts_length, int *p_edges_length, int *p_faces_length, int *loops_length,
 			short *is_sorted, short *initiate_sort, short auto_refresh);
 
 void BKE_copy_dsort_settings(struct DSortSettings *dss, struct DSortSettings *tdss);
