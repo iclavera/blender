@@ -607,6 +607,12 @@ static int rna_LaplacianDeformModifier_is_bind_get(PointerRNA *ptr)
 	return ((lmd->flag & MOD_LAPLACIANDEFORM_BIND) && (lmd->cache_system != NULL));
 }
 
+static PointerRNA rna_SortModifier_settings_get(PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	return rna_pointer_inherit_refine(ptr, &RNA_DSortSettings, ob->soft);
+}
+
 #else
 
 static PropertyRNA *rna_def_property_subdivision_common(StructRNA *srna, const char type[])
@@ -3662,24 +3668,25 @@ static void rna_def_modifier_sort(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "settings", PROP_POINTER, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_NEVER_NULL);
-	RNA_def_property_pointer_sdna(prop, NULL, "settings");
-	RNA_def_property_ui_text(prop, "DSort Settings", "");
+	RNA_def_property_struct_type(prop, "DSortSettings");
+	RNA_def_property_pointer_funcs(prop, "rna_SortModifier_settings_get", NULL, NULL, NULL);
+	RNA_def_property_ui_text(prop, "Dynamic Sort Settings", "");
 
 	prop = RNA_def_property(srna, "is_sorted", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "is_sorted", 1);
-	RNA_def_property_ui_text(prop, "Is Sorted", "Is Sorted.");
+	RNA_def_property_ui_text(prop, "Is Sorted", "Is Sorted");
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop = RNA_def_property(srna, "sort_initiated", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "initiate_sort", 1);
-	RNA_def_property_ui_text(prop, "Sort Initiated", "Sort Initiated.");
+	RNA_def_property_ui_text(prop, "Sort Initiated", "Sort Initiated");
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop = RNA_def_property(srna, "auto_refresh", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "auto_refresh", 1);
-	RNA_def_property_ui_text(prop, "Auto Refresh", "Refresh order on mesh change.");
+	RNA_def_property_ui_text(prop, "Auto Refresh", "Refresh order on mesh change");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
