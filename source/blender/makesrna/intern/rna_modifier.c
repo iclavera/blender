@@ -58,6 +58,7 @@
 EnumPropertyItem modifier_type_items[] = {
 	{0, "", 0, N_("Modify"), ""},
 	{eModifierType_MeshCache, "MESH_CACHE", ICON_MOD_MESHDEFORM, "Mesh Cache", ""},
+    {eModifierType_Sort, "SORT", ICON_MOD_SORT, "Sort", ""},
 	{eModifierType_UVProject, "UV_PROJECT", ICON_MOD_UVPROJECT, "UV Project", ""},
 	{eModifierType_UVWarp, "UV_WARP", ICON_MOD_UVPROJECT, "UV Warp", ""},
 	{eModifierType_WeightVGEdit, "VERTEX_WEIGHT_EDIT", ICON_MOD_VERTEX_WEIGHT, "Vertex Weight Edit", ""},
@@ -244,6 +245,8 @@ static StructRNA *rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_LaplacianDeformModifier;
 		case eModifierType_Wireframe:
 			return &RNA_WireframeModifier;
+        case eModifierType_SortModifier:
+			return &RNA_SortModifier;
 		/* Default */
 		case eModifierType_None:
 		case eModifierType_ShapeKey:
@@ -602,6 +605,17 @@ static int rna_LaplacianDeformModifier_is_bind_get(PointerRNA *ptr)
 {
 	LaplacianDeformModifierData *lmd = (LaplacianDeformModifierData *)ptr->data;
 	return ((lmd->flag & MOD_LAPLACIANDEFORM_BIND) && (lmd->cache_system != NULL));
+}
+
+static void rna_SortModifier_object_set(PointerRNA *ptr, PointerRNA value)
+{
+	modifier_object_set(ptr->id.data, &((SortModifierData *)ptr->data)->target_object, OB_EMPTY, value);
+}
+
+static void rna_SortModifier_vgroup_set(PointerRNA *ptr, const char *value)
+{
+	SortModifierData *smd = (SortModifierData *)ptr->data;
+	rna_object_vgroup_name_set(ptr, value, smd->vgroup, sizeof(smd->vgroup));
 }
 
 #else
@@ -3647,6 +3661,112 @@ static void rna_def_modifier_wireframe(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
+static void rna_def_modifier_sort(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static EnumPropertyItem prop_sort_type_items[] = {
+		{MOD_SORT_TYPE_AXIS, "AXIS", 0, "Axis", "Sort on axis"},
+		{MOD_SORT_TYPE_SELECTED, "SELECTED", 0, "Selected", "Sort from selected"},
+		{MOD_SORT_TYPE_CURSOR, "CURSOR", 0, "Cursor", "Sort from cursor"},
+		{MOD_SORT_TYPE_WEIGHTS, "WEIGHTS", 0, "Weights", "Sort from weights"},
+		{MOD_SORT_TYPE_OBJECT, "OBJECT", 0, "Object", "Sort from object"},
+		{MOD_SORT_TYPE_RANDOM, "RANDOMIZE", 0, "Randomize", "Randomize order"},
+		{MOD_SORT_TYPE_NONE, "NONE", 0, "None", "No sorting"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static EnumPropertyItem prop_axis_items[] = {
+		{MOD_SORT_AXIS_X, "X", 0, "X", "Sort on objects X axis"},
+		{MOD_SORT_AXIS_Y, "Y", 0, "Y", "Sort on objects Y axis"},
+		{MOD_SORT_AXIS_Z, "Z", 0, "Z", "Sort on objects Z axis"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "SortModifier", "Modifier");
+	RNA_def_struct_ui_text(srna, "Sort Modifier", "Sort modifier");
+	RNA_def_struct_sdna(srna, "SortModifierData");
+	RNA_def_struct_ui_icon(srna, ICON_MOD_SORT);
+
+	prop = RNA_def_property(srna, "target_object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Object", "Object to sort from");
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_SortModifier_object_set", NULL, "rna_Mesh_object_poll");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
+
+	prop = RNA_def_property(srna, "vgroup", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "vgroup");
+	RNA_def_property_ui_text(prop, "Vertex Group", "Name of Vertex Group to sort from");
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_SortModifier_vgroup_set");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "sort_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, prop_sort_type_items);
+	RNA_def_property_ui_text(prop, "Sort Type", "Sort Type");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "axis", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, prop_axis_items);
+	RNA_def_property_ui_text(prop, "Axis", "Sort on axis");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "use_original_mesh", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_original_mesh", 1);
+	RNA_def_property_ui_text(prop, "Use Original Mesh", "Use selected elements from original mesh.");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "connected_first", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "connected_first", 1);
+	RNA_def_property_ui_text(prop, "Connected First", "Connected First");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "use_random", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_random", 1);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Randomize Sorting Order", "Randomize Sorting Order");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "random_seed", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_sdna(prop, NULL, "random_seed");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Random Seed", "Seed of the random generator");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "sort_verts", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "sort_verts", 1);
+	RNA_def_property_ui_text(prop, "Sort Verts", "Sort Verts");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "sort_edges", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "sort_edges", 1);
+	RNA_def_property_ui_text(prop, "Sort Edges", "Sort Edges");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "sort_faces", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "sort_faces", 1);
+	RNA_def_property_ui_text(prop, "Sort Faces", "Sort Faces");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "auto_refresh", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "auto_refresh", 1);
+	RNA_def_property_ui_text(prop, "Auto Refresh", "Refresh order on mesh change.");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "is_sorted", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "is_sorted", 1);
+	RNA_def_property_ui_text(prop, "Is Sorted", "Is Sorted.");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "ui_info", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_sdna(prop, NULL, "ui_info");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "UI Info", "UI Info");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+}
+
 void RNA_def_modifier(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -3759,6 +3879,7 @@ void RNA_def_modifier(BlenderRNA *brna)
 	rna_def_modifier_meshcache(brna);
 	rna_def_modifier_laplaciandeform(brna);
 	rna_def_modifier_wireframe(brna);
+    rna_def_modifier_sort(brna);
 }
 
 #endif
