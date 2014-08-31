@@ -46,6 +46,21 @@
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 
+static char *rna_DSortSettings_path(PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	ModifierData *md = modifiers_findByType(ob, eModifierType_Sort);
+
+	if (md) {
+		char name_esc[sizeof(md->name) * 2];
+		BLI_strescape(name_esc, md->name, sizeof(name_esc));
+		return BLI_sprintfN("modifiers[\"%s\"].settings", name_esc);
+	}
+	else {
+		return NULL;
+	}
+}
+
 static void rna_DSort_vgroup_set(PointerRNA *ptr, const char *value)
 {
 	DSortSettings *dss = (DSortSettings *)ptr->data;
@@ -150,6 +165,11 @@ static void rna_def_dsort_settings(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "sort_elems", DSORT_ELEMS_FACES);
 	RNA_def_property_ui_text(prop, "Sort Faces", "Sort Faces");
 	RNA_def_property_update(prop, 0, "rna_DSort_update");
+}
+
+void RNA_def_dsort(BlenderRNA *brna)
+{
+	rna_def_dsort_settings(brna);
 }
 
 #endif
