@@ -1369,6 +1369,14 @@ static void write_modifiers(WriteData *wd, ListBase *modbase)
 			
 			writedata(wd, DATA, sizeof(int)*hmd->totindex, hmd->indexar);
 		}
+        else if (md->type==eModifierType_Sort) {
+			SortModifierData *smd = (SortModifierData*) md;
+
+			writedata(wd, DATA, sizeof(int)*smd->verts_length, smd->verts);
+			writedata(wd, DATA, sizeof(int)*smd->edges_length, smd->edges);
+			writedata(wd, DATA, sizeof(int)*smd->faces_length, smd->faces);
+			writedata(wd, DATA, sizeof(float)*3*smd->coords_num, smd->coords);
+		}
 		else if (md->type==eModifierType_Cloth) {
 			ClothModifierData *clmd = (ClothModifierData*) md;
 			

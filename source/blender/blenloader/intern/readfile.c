@@ -4736,6 +4736,29 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				BLI_endian_switch_int32_array(hmd->indexar, hmd->totindex);
 			}
 		}
+		else if (md->type == eModifierType_Sort) {
+            SortModifierData *smd = (SortModifierData *)md;
+
+            smd->verts = newdataadr(fd, smd->verts);
+            if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+                BLI_endian_switch_int32_array(smd->verts, smd->verts_length);
+            }
+
+            smd->edges = newdataadr(fd, smd->edges);
+            if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+                BLI_endian_switch_int32_array(smd->edges, smd->edges_length);
+            }
+
+            smd->faces = newdataadr(fd, smd->faces);
+            if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+                BLI_endian_switch_int32_array(smd->faces, smd->faces_length);
+            }
+
+            smd->coords = newdataadr(fd, smd->coords);
+            if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+                BLI_endian_switch_float_array(smd->coords, smd->coords_num * 3);
+            }
+        }
 		else if (md->type == eModifierType_ParticleSystem) {
 			ParticleSystemModifierData *psmd = (ParticleSystemModifierData *)md;
 			
