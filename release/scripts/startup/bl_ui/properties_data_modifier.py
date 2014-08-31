@@ -817,6 +817,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "use_even_offset")
         col.prop(md, "use_quality_normals")
         col.prop(md, "use_rim")
+        col.prop(md, "use_keep_normals")
 
         col.separator()
 
@@ -828,9 +829,6 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row = row.row(align=True)
         row.active = md.use_rim
         row.prop(md, "material_offset_rim", text="Rim")
-        
-        row = row.split()
-        row.prop(md, "use_keep_normals")
 
     def SUBSURF(self, layout, ob, md):
         layout.row().prop(md, "subdivision_type", expand=True)
