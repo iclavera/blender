@@ -1364,74 +1364,29 @@ enum {
 };
 
 typedef struct SortModifierData {
+
 	ModifierData modifier;
 
-	struct Object *target_object;
+	/* settings in DNA_dsort_types.h */
+	struct DSortSettings *settings;
 
-	int *faces;
-	int *edges;
-	int *verts;
-	float (*coords)[3];
+	/* cache */
+	int *faces_order;
+	int *edges_order;
+	int *verts_order;
 
-	char vgroup[64];
-
-	int ui_info;
-
-	int coords_num;
-
+	/* to check if mesh changed */
 	int faces_length;
 	int edges_length;
 	int verts_length;
 
-	int sort_type;
-	/* for MOD_SORT_TYPE_AXIS */
-	int axis;
-	/* for MOD_OORT_TYPE_OBJECT */
-	int random_seed;
-	short use_random;
-	/* for MOD_SORT_TYPE_SELECTED */
-	short use_original_mesh;
-	short connected_first;
-
-	short sort_verts;
-	short sort_edges;
-	short sort_loops;
-	short sort_faces;
-
-	short sort_initiated;
-	short auto_refresh;
-
-	/* for UI */
+	short initiate_sort;
 	short is_sorted;
 
+	short auto_refresh;
+
 	short pad1;
-	short pad2;
-
 } SortModifierData;
-
-/* Sort Modifier Types */
-enum {
-	MOD_SORT_TYPE_AXIS  = 1,
-	MOD_SORT_TYPE_SELECTED  = 2,
-	MOD_SORT_TYPE_CURSOR  = 3,
-	MOD_SORT_TYPE_WEIGHTS  = 4,
-	MOD_SORT_TYPE_OBJECT  = 5,
-	MOD_SORT_TYPE_RANDOM = 6,
-	MOD_SORT_TYPE_NONE = 7
-};
-
-enum {
-	MOD_SORT_AXIS_X = 1,
-	MOD_SORT_AXIS_Y = 2,
-	MOD_SORT_AXIS_Z = 3
-};
-
-enum {
-	MOD_SORT_NONE = 0,
-	MOD_SORT_VERTS = 1,
-	MOD_SORT_EDGES = 2,
-	MOD_SORT_FACES = 4
-};
 
 
 
