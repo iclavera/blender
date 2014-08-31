@@ -44,6 +44,7 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_dsort_types.h"
 
 #include "BKE_action.h"
 #include "BKE_context.h"
@@ -56,6 +57,7 @@
 #include "BKE_scene.h"
 #include "BKE_deform.h"
 #include "BKE_dsort.h"
+#include "BKE_DerivedMesh.h"
 
 #include "RNA_define.h"
 #include "RNA_access.h"
@@ -72,6 +74,9 @@
 
 #include "object_intern.h"
 
+#include "bmesh.h"
+
+
 static EnumPropertyItem *sort_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {
 	Object *ob = CTX_data_edit_object(C);
@@ -84,7 +89,7 @@ static EnumPropertyItem *sort_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), Pr
 		return DummyRNA_NULL_items;
 
 	for (a = 0, md = ob->modifiers.first; md; md = md->next, a++) {
-		if (md->type == eModifierType_Hook) {
+		if (md->type == eModifierType_Sort) {
 			tmp.value = a;
 			tmp.icon = ICON_MOD_SORT;
 			tmp.identifier = md->name;
@@ -101,42 +106,46 @@ static EnumPropertyItem *sort_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), Pr
 
 static int object_dsort_exec(bContext *C, wmOperator *op)
 {
-
 	View3D *v3d = CTX_wm_view3d(C);
 	PointerRNA ptr = CTX_data_pointer_get_type(C, "modifier", &RNA_SortModifier);
 	int num = RNA_enum_get(op->ptr, "modifier");
 	Object *ob = NULL;
 	SortModifierData *smd = NULL;
 
+	/* for sorting */
+	Scene *scene = CTX_data_scene(C);
+	BMesh *bm = NULL;
+	DerivedMesh *dm = NULL;
+
+
 	if (ptr.data) {     /* if modifier context is available, use that */
 		ob = ptr.id.data;
 		smd = ptr.data;
-	}
-	else {          /* use the provided property */
+	} else {          /* use the provided property */
 		ob = CTX_data_active_object(C);
 		smd = (SortModifierData *)BLI_findlink(&ob->modifiers, num);
 	}
+
 	if (!ob || !smd) {
 		BKE_report(op->reports, RPT_ERROR, "Could not find sort modifier");
 		return OPERATOR_CANCELLED;
 	}
+
 	if (smd->is_sorted) {
 		BKE_report(op->reports, RPT_ERROR, "Free sort first.");
 		return OPERATOR_CANCELLED;
 	}
 
-	smd->sort_initiated = true;
+	smd->initiate_sort = true;
 
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
 
 	return OPERATOR_FINISHED;
-
 }
 
 void OBJECT_OT_dsort(wmOperatorType *ot)
 {
-
 	PropertyRNA *prop;
 
 	ot->name = "Dynamic Sort";
@@ -144,7 +153,7 @@ void OBJECT_OT_dsort(wmOperatorType *ot)
 	ot->idname = "OBJECT_OT_dsort";
 
 	ot->exec = object_dsort_exec;
-	ot->poll = ED_operator_objectmode;
+	ot->poll = ED_operator_object_active_editable_mesh;
 
 	ot->flag = /*OPTYPE_REGISTER |*/ OPTYPE_UNDO;
 
@@ -155,7 +164,6 @@ void OBJECT_OT_dsort(wmOperatorType *ot)
 
 static int object_dsort_free_exec(bContext *C, wmOperator *op)
 {
-
 	PointerRNA ptr = CTX_data_pointer_get_type(C, "modifier", &RNA_SortModifier);
 	int num = RNA_enum_get(op->ptr, "modifier");
 	Object *ob = NULL;
@@ -164,55 +172,32 @@ static int object_dsort_free_exec(bContext *C, wmOperator *op)
 	if (ptr.data) {     /* if modifier context is available, use that */
 		ob = ptr.id.data;
 		smd = ptr.data;
-	}
-	else {          /* use the provided property */
+	} else {          /* use the provided property */
 		ob = CTX_data_active_object(C);
 		smd = (SortModifierData *)BLI_findlink(&ob->modifiers, num);
 	}
+
 	if (!ob || !smd) {
 		BKE_report(op->reports, RPT_ERROR, "Could not find sort modifier");
 		return OPERATOR_CANCELLED;
 	}
 
-	if (smd->verts != NULL) {
-		MEM_freeN(smd->verts);
-		smd->verts = NULL;
-		smd->verts_length = 0;
-	}
-
-	if (smd->edges != NULL) {
-		MEM_freeN(smd->edges);
-		smd->edges = NULL;
-		smd->edges_length = 0;
-	}
-
-	if (smd->faces != NULL) {
-		MEM_freeN(smd->faces);
-		smd->faces = NULL;
-		smd->faces_length = 0;
-	}
-
-	if (smd->coords != NULL) {
-		MEM_freeN(smd->coords);
-		smd->coords = NULL;
-		smd->coords_num = 0;
-	}
-
-	smd->is_sorted = false;
+	/* Freeing dsort data */
+	BKE_dsort_free_data(smd->settings,
+						&smd->verts_order, &smd->edges_order, &smd->faces_order,
+						&smd->is_sorted, &smd->initiate_sort);
 
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, ob);
 
 	return OPERATOR_FINISHED;
-
 }
 
 void OBJECT_OT_dsort_free(wmOperatorType *ot)
 {
-
 	PropertyRNA *prop;
 
-	ot->name = "Dynamic Sort Free";
+	ot->name = "DSort Free";
 	ot->description = "Dynamic Sort Free";
 	ot->idname = "OBJECT_OT_dsort_free";
 
@@ -226,5 +211,4 @@ void OBJECT_OT_dsort_free(wmOperatorType *ot)
 	/* properties */
 	prop = RNA_def_enum(ot->srna, "modifier", DummyRNA_NULL_items, 0, "Modifier", "Modifier number to assign to");
 	RNA_def_enum_funcs(prop, sort_mod_itemf);
-
 }

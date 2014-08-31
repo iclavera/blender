@@ -29,6 +29,7 @@
  */
 
 #include "DNA_meshdata_types.h"
+#include "DNA_dsort_types.h"
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -48,142 +49,110 @@
 
 #include "BKE_dsort.h"
 
+static void SortModifier_initDSortSettings(DSortSettings *dss)
+{
+	dss->coords = NULL;
+	dss->vgroup[0] = '\0';
 
-static void initData(ModifierData *md) {
-	SortModifierData *smd = (SortModifierData *) md;
+	dss->coords_num = 0;
 
-	smd->target_object = NULL;
-	smd->coords = NULL;
-	smd->vgroup[0] = '\0';
+	/* general settings */
+	dss->sort_type = DSORT_TYPE_AXIS;
+	dss->reverse = false;
 
-	smd->coords_num = 0;
+	/* for DSORT_TYPE_AXIS */
+	dss->axis = DSORT_AXIS_X;
 
-	smd->faces = NULL;
-	smd->faces_length = 0;
-	smd->edges = NULL;
-	smd->edges_length = 0;
-	smd->verts = NULL;
-	smd->verts_length = 0;
+	/* for DSORT_TYPE_RANDOMIZE */
+	dss->random_seed = 0;
 
-	smd->sort_type = MOD_SORT_TYPE_AXIS;
-	smd->axis = MOD_SORT_AXIS_X;
-	smd->use_original_mesh = false;
+	/* for DSORT_TYPE_SELECTED */
+	dss->use_original_mesh = false;
+	dss->connected_first = false;
 
-	smd->use_random = true;
-	smd->random_seed = 0;
-
-	smd->connected_first = false;
-	smd->sort_verts = false;
-	smd->sort_edges = false;
-	smd->sort_faces = true;
-
-	smd->auto_refresh = false;
-
-	smd->is_sorted = false;
-
-	smd->sort_initiated = true;
+	dss->sort_elems = DSORT_ELEMS_VERTS | DSORT_ELEMS_FACES;
 }
 
-static void SortModifier_freeElemsOrder(SortModifierData *smd)
+static void initData(ModifierData *md)
 {
-	if (smd->verts) {
-		MEM_freeN(smd->verts);
-		smd->verts = NULL;
-		smd->verts_length = 0;
-	}
+	SortModifierData *smd = (SortModifierData *) md;
 
-	if (smd->edges) {
-		MEM_freeN(smd->edges);
-		smd->edges = NULL;
-		smd->edges_length = 0;
-	}
+	smd->settings = MEM_callocN(sizeof(DSortSettings), "SortModifier settings");
 
-	if (smd->faces) {
-		MEM_freeN(smd->faces);
-		smd->faces = NULL;
-		smd->faces_length = 0;
-	}
+	SortModifier_initDSortSettings(smd->settings);
+
+	smd->faces_order = NULL;
+	smd->edges_order = NULL;
+	smd->verts_order = NULL;
+
+	smd->faces_length = 0;
+	smd->edges_length = 0;
+	smd->verts_length = 0;
+
+	/* for UI */
+	smd->is_sorted = false;
+	smd->initiate_sort = true;
+
+	smd->auto_refresh = false;
 }
 
 static void SortModifier_freeData(SortModifierData *smd)
 {
-
-	SortModifier_freeElemsOrder(smd);
-
-	if (smd->coords) {
-		MEM_freeN(smd->coords);
-		smd->coords = NULL;
-		smd->coords_num = 0;
-	}
-
-	smd->is_sorted = false;
-	smd->ui_info = MOD_SORT_NONE;
-
+	/* Freeing dsort data */
+	BKE_dsort_free_data(smd->settings, &smd->verts_order, &smd->edges_order, &smd->faces_order, &smd->is_sorted, &smd->initiate_sort);
 }
 
-static void freeData(ModifierData *md) {
-
+static void freeData(ModifierData *md)
+{
 	SortModifierData *smd = (SortModifierData *) md;
-
-	SortModifier_freeData(smd);
-
+	SortModifier_freeData(smd);	
+	/* Freeing dsort settings */
+	MEM_freeN(smd->settings);
 }
 
-static void copyData(ModifierData *md, ModifierData *target) {
-
+static void copyData(ModifierData *md, ModifierData *target)
+{
 	SortModifierData *smd = (SortModifierData *) md;
 	SortModifierData *tsmd = (SortModifierData *) target;
 	int i;
 
-	tsmd->target_object = smd->target_object;
-	tsmd->coords = MEM_mallocN(sizeof(float)*3*smd->coords_num, "MOD_sort coords");
-	for(i=0; i<smd->coords_num; i++)
-		copy_v3_v3(tsmd->coords[i], smd->coords[i]);
-	tsmd->coords_num = smd->coords_num;
+	BKE_copy_dsort_settings(smd->settings, tsmd->settings);
 
-	BLI_strncpy(tsmd->vgroup, smd->vgroup, sizeof(tsmd->vgroup));
+	tsmd->verts_order = NULL;
+	tsmd->verts_length = 0;
 
-	tsmd->sort_type = smd->sort_type;
-	tsmd->axis = smd->axis;
-	tsmd->use_original_mesh = smd->use_original_mesh;
+	tsmd->edges_order = NULL;
+	tsmd->edges_length = 0;
 
-	tsmd->use_random = smd->use_random;
-	tsmd->random_seed = smd->random_seed;
-
-	tsmd->connected_first = smd->connected_first;
-	tsmd->sort_verts = smd->sort_verts;
-	tsmd->sort_edges = smd->sort_edges;
-	tsmd->sort_faces = smd->sort_faces;
+	tsmd->faces_order = NULL;
+	tsmd->faces_length = 0;
 
 	/* Inititate sort */
-	tsmd->sort_initiated = true;
-
+	tsmd->is_sorted = false;
+	tsmd->initiate_sort = true;
 }
 
-static int isDisabled(ModifierData *md, int UNUSED(useRenderParams)) {
-
+static int isDisabled(ModifierData *md, int UNUSED(useRenderParams))
+{
 	SortModifierData *smd = (SortModifierData *)md;
 
-	if (smd->sort_type == MOD_SORT_TYPE_WEIGHTS)
-			return !smd->vgroup[0];
+	if (smd->is_sorted || smd->initiate_sort)
+		return 0;
 
-	if (smd->sort_type == MOD_SORT_TYPE_OBJECT)
-		return !smd->target_object;
-
-	if (!smd->is_sorted && !smd->sort_initiated)
-		return 1;
+	if (smd->settings->sort_type == DSORT_TYPE_WEIGHTS)
+		return !smd->settings->vgroup[0];
 
 	return 0;
-
 }
 
-static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md) {
+static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
+{
 	SortModifierData *smd = (SortModifierData *) md;
 	CustomDataMask dataMask;
 
 	dataMask = 0;
 
-	if (smd->vgroup[0])
+	if (smd->settings->vgroup[0])
 		dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
@@ -191,113 +160,38 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md) {
 
 static DerivedMesh *SortModifier_do(ModifierData *md, Object *ob, DerivedMesh *dm)
 {
-
 	SortModifierData *smd;
 	BMesh *bm;
 	DerivedMesh *result;
-	short auto_refresh;
-	short initiate_sort;
 
 	smd = (SortModifierData *)md;
 
-	initiate_sort = smd->sort_initiated;
+	bm = DM_to_bmesh(dm, false);
 
-	auto_refresh = smd->auto_refresh;
+	if (!BKE_dsort_bm(md, bm, smd->settings,
+				&smd->verts_order, &smd->edges_order, &smd->faces_order,
+				&smd->verts_length, &smd->edges_length, &smd->faces_length, NULL,
+				&smd->is_sorted, &smd->initiate_sort, smd->auto_refresh)) {
+		BM_mesh_free(bm);
 
-	if (!initiate_sort) {
-		if ((smd->verts && smd->verts_length != dm->numVertData) ||
-			(smd->edges && smd->edges_length != dm->numEdgeData) ||
-			(smd->faces && smd->faces_length != dm->numPolyData)) {
-
-			SortModifier_freeElemsOrder(smd);
-
-			if (auto_refresh)
-				smd->sort_initiated = true;
-			else {
-				smd->ui_info = MOD_SORT_NONE;
-				smd->is_sorted = false;
-			}
-		}
-	}
-
-	bm = NULL;
-
-	if (initiate_sort && (smd->sort_verts || smd->sort_edges || smd->sort_faces)) {
-
-		bm = DM_to_bmesh(dm, false);
-
-		smd->ui_info = MOD_SORT_NONE;
-
-		dsort_from_bm((ModifierData *)smd, ob, bm, smd->sort_type,
-				smd->use_original_mesh, smd->connected_first, &smd->coords, &smd->coords_num,
-				smd->axis, smd->vgroup, smd->target_object, smd->use_random, smd->random_seed,
-				&smd->verts, &smd->edges, &smd->faces, NULL,
-				smd->sort_verts, smd->sort_edges, smd->sort_faces, false);
-
-		if (smd->verts) {
-			smd->verts_length = bm->totvert;
-			smd->ui_info |= MOD_SORT_VERTS;
-		}
-
-		if (smd->edges) {
-			smd->edges_length = bm->totedge;
-			smd->ui_info |= MOD_SORT_EDGES;
-		}
-
-		if (smd->faces) {
-			smd->faces_length = bm->totface;
-			smd->ui_info |= MOD_SORT_FACES;
-		}
-
-		smd->is_sorted = true;
-		smd->sort_initiated = false;
-	}
-
-	if (!smd->is_sorted)
 		return dm;
-
-	if (!bm)
-		bm = DM_to_bmesh(dm, false);
-
-	BM_mesh_remap(bm, smd->verts, smd->edges, smd->faces);
-
+	}
+	
 	result = CDDM_from_bmesh(bm, false);
 	BM_mesh_free(bm);
-
 	return result;
-
 }
 
 static DerivedMesh *applyModifier(ModifierData *md, struct Object *ob,
-		DerivedMesh *derivedData, int useRenderParams, int isFinalCalc) {
-
+		DerivedMesh *derivedData, int useRenderParams, int isFinalCalc)
+{
 	return SortModifier_do(md, ob, derivedData);
-
 }
 
 static DerivedMesh *applyModifierEm(ModifierData *md, struct Object *ob,
-		struct EditMesh *editData, struct DerivedMesh *derivedData) {
-
+		struct EditMesh *editData, struct DerivedMesh *derivedData)
+{
 	return SortModifier_do(md, ob, derivedData);
-
-}
-
-static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk,
-		void *userData) {
-
-	SortModifierData *smd = (SortModifierData *) md;
-
-	walk(userData, ob, &smd->target_object);
-}
-
-static void updateDepgraph(ModifierData *md, DagForest *forest,
-		struct Scene *UNUSED(scene), Object *UNUSED(ob), DagNode *obNode) {
-
-	SortModifierData *smd = (SortModifierData *) md;
-
-	if (smd->target_object)
-		dag_add_relation(forest, dag_get_node(forest, smd->target_object), obNode,
-				DAG_RL_DATA_DATA, "Sort Modifier");
 }
 
 ModifierTypeInfo modifierType_Sort = {
@@ -318,9 +212,9 @@ ModifierTypeInfo modifierType_Sort = {
 /* requiredDataMask */requiredDataMask,
 /* freeData */freeData,
 /* isDisabled */isDisabled,
-/* updateDepgraph */updateDepgraph,
+/* updateDepgraph */NULL,
 /* dependsOnTime */NULL,
 /* dependsOnNormals */NULL,
-/* foreachObjectLink */foreachObjectLink,
+/* foreachObjectLink */NULL,
 /* foreachIDLink */NULL,
 /* foreachTexLink */NULL , };

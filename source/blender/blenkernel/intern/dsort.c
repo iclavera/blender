@@ -44,10 +44,13 @@
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 #include "DNA_modifier_types.h"
+#include "DNA_dsort_types.h"
 
 #include "BKE_deform.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_mesh.h"
+
+#include "BLI_string.h"
 
 #define DSORT_MAX_COORDS 10
 #define DSORT_FLT_MAX 3.402823466e+38F
@@ -59,7 +62,7 @@ typedef struct FloatBMElem {
 }FloatBMElem;
 
 
-int BKE_dsort_compare_float_bm_elem(const void *p1, const void *p2)
+int dsort_compare_float_bm_elem(const void *p1, const void *p2)
 {
 	FloatBMElem fi1 = *(FloatBMElem *)p1;
 	FloatBMElem fi2 = *(FloatBMElem *)p2;
@@ -105,7 +108,21 @@ void BKE_dsort_get_bm_elem_center(void *elem, const char etype, float center[3])
 	}
 }
 
-char BKE_dsort_bm_elem_flag_test(void *elem, const char etype, const char flag)
+int BKE_dsort_get_bm_elems_length(BMesh *bm, const char etype)
+{
+	switch (etype) {
+		case BM_VERT:
+			return bm->totvert;
+		case BM_EDGE:
+			return bm->totedge;
+		case BM_FACE:
+			return bm->totedge;
+		default:
+			return -1;
+	}
+}
+
+char dsort_bm_elem_flag_test(void *elem, const char etype, const char flag)
 {
 	switch (etype) {
 		case BM_VERT:
@@ -119,7 +136,7 @@ char BKE_dsort_bm_elem_flag_test(void *elem, const char etype, const char flag)
 	}
 }
 
-void *BKE_dsort_bm_elem_at_index(BMesh *bm, const char etype, const int index)
+void *dsort_bm_elem_at_index(BMesh *bm, const char etype, const int index)
 {
 	switch (etype) {
 		case BM_VERT:
@@ -133,14 +150,14 @@ void *BKE_dsort_bm_elem_at_index(BMesh *bm, const char etype, const int index)
 	}
 }
 
-void BKE_dsort_create_order_single_not_connected_first(int *elems_order, int length, const char etype, FloatBMElem *distances)
+void dsort_create_order_single_not_connected_first(int *elems_order, int length, const char etype, FloatBMElem *distances)
 {
 	int i;
 	for(i = 0; i < length; i++)
 		elems_order[BKE_dsort_get_bm_elem_index(distances[i].el, etype)] = i;
 }
 
-void BKE_dsort_create_order_single_connected_first(int *elems_order, int length, const char etype, int itype, int iitype, FloatBMElem *distances)
+void dsort_create_order_single_connected_first(int *elems_order, int length, const char etype, int itype, int iitype, FloatBMElem *distances)
 {
 	int i, j, k, j_start, old_i, found, connection_level;
 	/* connection level */
@@ -150,11 +167,11 @@ void BKE_dsort_create_order_single_connected_first(int *elems_order, int length,
 	int *q_distances;
 	BMIter iter, iiter;
 
-	connected = MEM_callocN(sizeof(int) * length, "BKE_dsort_create_order_single_connected_first connected");
-	used = MEM_callocN(sizeof(char) * length, "BKE_dsort_create_order_single_connected_first used");
+	connected = MEM_callocN(sizeof(int) * length, "dsort_create_order_single_connected_first connected");
+	used = MEM_callocN(sizeof(char) * length, "dsort_create_order_single_connected_first used");
 
 	// For faster lookups.
-	q_distances = MEM_callocN(sizeof(int) * length, "BKE_dsort_create_order_single_connected_first q_distances");
+	q_distances = MEM_callocN(sizeof(int) * length, "dsort_create_order_single_connected_first q_distances");
 	for(i=0; i<length; i++)
 		q_distances[i] = BKE_dsort_get_bm_elem_index(distances[i].el, etype);
 
@@ -229,14 +246,14 @@ void BKE_dsort_create_order_single_connected_first(int *elems_order, int length,
 
 }
 
-void BKE_dsort_create_order_multiple_not_connected_first(int *elems_order, int length, const char etype, FloatBMElem **distances, int coords_num)
+void dsort_create_order_multiple_not_connected_first(int *elems_order, int length, const char etype, FloatBMElem **distances, int distances_num)
 {
 
 	int i, i_index, old_i;
 	int indexes[DSORT_MAX_COORDS];
-	char *used = (char *)MEM_callocN(sizeof(char) * length, "BKE_dsort_create_order_multiple_not_connected used");
+	char *used = (char *)MEM_callocN(sizeof(char) * length, "dsort_create_order_multiple_not_connected used");
 
-	for(i=0; i<coords_num; i++)
+	for(i = 0; i < distances_num; i++)
 		indexes[i] = 0;
 
 	i_index = 0;
@@ -250,7 +267,7 @@ void BKE_dsort_create_order_multiple_not_connected_first(int *elems_order, int l
 		used[old_i] = true;
 		indexes[i_index]++;
 		i_index++;
-		if (i_index >= coords_num)
+		if (i_index >= distances_num)
 			i_index = 0;
 	}
 
@@ -258,7 +275,7 @@ void BKE_dsort_create_order_multiple_not_connected_first(int *elems_order, int l
 
 }
 
-void BKE_dsort_create_order_multiple_connected_first(int *elems_order, int length, const char etype, int itype, int iitype, FloatBMElem **distances, int coords_num)
+void dsort_create_order_multiple_connected_first(int *elems_order, int length, const char etype, int itype, int iitype, FloatBMElem **distances, int distances_num)
 {
 
 	int i, j, k, n, old_i, found;
@@ -270,25 +287,25 @@ void BKE_dsort_create_order_multiple_connected_first(int *elems_order, int lengt
 	int **q_distances;
 	BMIter iter, iiter;
 
-	connection_level = MEM_callocN(sizeof(int) * coords_num, "BKE_dsort_create_order_multiple_connected connection_level");
-	j_start = MEM_callocN(sizeof(int) * coords_num, "BKE_dsort_create_order_multiple_connected j_start");
+	connection_level = MEM_callocN(sizeof(int) * distances_num, "dsort_create_order_multiple_connected connection_level");
+	j_start = MEM_callocN(sizeof(int) * distances_num, "dsort_create_order_multiple_connected j_start");
 
-	connected = MEM_callocN(sizeof(int *) * coords_num, "BKE_dsort_create_order_multiple_connected connected");
-	for(n=0; n<coords_num; n++)
-		connected[n] = MEM_callocN(sizeof(int) * length, "BKE_dsort_create_order_multiple_connected connected[i]");
+	connected = MEM_callocN(sizeof(int *) * distances_num, "dsort_create_order_multiple_connected connected");
+	for(n = 0; n < distances_num; n++)
+		connected[n] = MEM_callocN(sizeof(int) * length, "dsort_create_order_multiple_connected connected[i]");
 
-	used = MEM_callocN(sizeof(char) * length, "BKE_dsort_create_order_multiple_connected used");
+	used = MEM_callocN(sizeof(char) * length, "dsort_create_order_multiple_connected used");
 
 	// For faster lookups.
-	q_distances = MEM_callocN(sizeof(int *) * coords_num, "BKE_dsort_create_order_multiple_connected q_distances");
-	for(n=0; n<coords_num; n++) {
-		q_distances[n] = MEM_callocN(sizeof(int) * length, "BKE_dsort_create_order_multiple_connected q_distances[i]");
+	q_distances = MEM_callocN(sizeof(int *) * distances_num, "dsort_create_order_multiple_connected q_distances");
+	for(n=0; n < distances_num; n++) {
+		q_distances[n] = MEM_callocN(sizeof(int) * length, "dsort_create_order_multiple_connected q_distances[i]");
 
 		for(i=0; i<length; i++)
 			q_distances[n][i] = BKE_dsort_get_bm_elem_index(distances[n][i].el, etype);
 	}
 
-	for(n=0; n<coords_num; n++) {
+	for(n=0; n < distances_num; n++) {
 		j_start[n] = 1;
 		connection_level[n] = 1;
 
@@ -356,12 +373,12 @@ void BKE_dsort_create_order_multiple_connected_first(int *elems_order, int lengt
 		elems_order[old_i] = i;
 
 		n++;
-		if (n >= coords_num)
+		if (n >= distances_num)
 			n = 0;
 
 	}
 
-	for(n=0; n<coords_num; n++) {
+	for(n = 0; n < distances_num; n++) {
 		MEM_freeN(connected[n]);
 		MEM_freeN(q_distances[n]);
 	}
@@ -374,7 +391,7 @@ void BKE_dsort_create_order_multiple_connected_first(int *elems_order, int lengt
 
 }
 
-FloatBMElem *BKE_dsort_elems_from_axis(BMesh *bm, int length, const char etype, int mitype, int axis)
+FloatBMElem *dsort_elems_from_axis(BMesh *bm, int length, const char etype, int mitype, int axis)
 {
 
 	int i;
@@ -383,23 +400,23 @@ FloatBMElem *BKE_dsort_elems_from_axis(BMesh *bm, int length, const char etype, 
 	FloatBMElem *distances;
 	float center[3];
 
-	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "BKE_dsort_order_from_dm distances");
+	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "dsort_order_from_dm distances");
 
-	if (axis == MOD_SORT_AXIS_X) {
+	if (axis == DSORT_AXIS_X) {
 		BM_ITER_MESH_INDEX(elem, &iter, bm, mitype, i) {
 			BKE_dsort_get_bm_elem_center(elem, etype, center);
 			distances[i].fl = center[0];
 			distances[i].el = elem;
 		}
 	}
-	else if (axis == MOD_SORT_AXIS_Y) {
+	else if (axis == DSORT_AXIS_Y) {
 		BM_ITER_MESH_INDEX(elem, &iter, bm, mitype, i) {
 			BKE_dsort_get_bm_elem_center(elem, etype, center);
 			distances[i].fl = center[1];
 			distances[i].el = elem;
 		}
 	}
-	else if (axis == MOD_SORT_AXIS_Z) {
+	else if (axis == DSORT_AXIS_Z) {
 		BM_ITER_MESH_INDEX(elem, &iter, bm, mitype, i) {
 			BKE_dsort_get_bm_elem_center(elem, etype, center);
 			distances[i].fl = center[2];
@@ -407,13 +424,13 @@ FloatBMElem *BKE_dsort_elems_from_axis(BMesh *bm, int length, const char etype, 
 		}
 	}
 
-	qsort(distances, length, sizeof(FloatBMElem), BKE_dsort_compare_float_bm_elem);
+	qsort(distances, length, sizeof(FloatBMElem), dsort_compare_float_bm_elem);
 
 	return distances;
 
 }
 
-FloatBMElem **BKE_dsort_elems_from_coords(BMesh *bm, int length, const char etype, int mitype, float (*coords)[3], int coords_num)
+FloatBMElem **dsort_elems_from_coords(BMesh *bm, int length, const char etype, int mitype, float (*coords)[3], int coords_num)
 {
 
 	int i, j;
@@ -422,11 +439,11 @@ FloatBMElem **BKE_dsort_elems_from_coords(BMesh *bm, int length, const char etyp
 	FloatBMElem **distances;
 	float center[3];
 
-	distances = MEM_mallocN(sizeof(FloatBMElem *) * coords_num, "BKE_dsort_elems_from_coords distances");
+	distances = MEM_mallocN(sizeof(FloatBMElem *) * coords_num, "dsort_elems_from_coords distances");
 
 	for(i=0; i<coords_num; i++) {
 
-		distances[i] = MEM_mallocN(sizeof(FloatBMElem) * length, "BKE_dsort_elems_from_coords distances[i]");
+		distances[i] = MEM_mallocN(sizeof(FloatBMElem) * length, "dsort_elems_from_coords distances[i]");
 
 		BM_ITER_MESH_INDEX(elem, &iter, bm, mitype, j) {
 			BKE_dsort_get_bm_elem_center(elem, etype, center);
@@ -434,14 +451,14 @@ FloatBMElem **BKE_dsort_elems_from_coords(BMesh *bm, int length, const char etyp
 			distances[i][j].el = elem;
 		}
 
-		qsort(distances[i], length, sizeof(FloatBMElem), BKE_dsort_compare_float_bm_elem);
+		qsort(distances[i], length, sizeof(FloatBMElem), dsort_compare_float_bm_elem);
 	}
 
 	return distances;
 
 }
 
-FloatBMElem **BKE_dsort_elems_from_selected(BMesh *bm, Object *ob, int length, const char etype, int mitype, float (**coords)[3], int *coords_num, short use_original_mesh)
+FloatBMElem **dsort_elems_from_selected(BMesh *bm, Object *ob, int length, const char etype, int mitype, float (**coords)[3], int *coords_num, short use_original_mesh)
 {
 
 	void *elem;
@@ -449,7 +466,7 @@ FloatBMElem **BKE_dsort_elems_from_selected(BMesh *bm, Object *ob, int length, c
 	int temp_etype, temp_mitype, temp_coords_num;
 	BMesh *temp_bm;
 
-	*coords = MEM_mallocN(sizeof(float)*3, "BKE_dsort_elems_from_selected coords");
+	*coords = MEM_mallocN(sizeof(float)*3, "dsort_elems_from_selected coords");
 	temp_coords_num = 1;
 	*coords_num = 0;
 
@@ -466,7 +483,7 @@ FloatBMElem **BKE_dsort_elems_from_selected(BMesh *bm, Object *ob, int length, c
 
 		BM_ITER_MESH(elem, &iter, temp_bm, temp_mitype) {
 
-			if (BKE_dsort_bm_elem_flag_test(elem, temp_etype, BM_ELEM_SELECT)) {
+			if (dsort_bm_elem_flag_test(elem, temp_etype, BM_ELEM_SELECT)) {
 
 				if (*coords_num >= temp_coords_num) {
 
@@ -515,21 +532,20 @@ FloatBMElem **BKE_dsort_elems_from_selected(BMesh *bm, Object *ob, int length, c
 	}
 
 
-	return BKE_dsort_elems_from_coords(bm, length, etype, mitype, *coords, *coords_num);
+	return dsort_elems_from_coords(bm, length, etype, mitype, *coords, *coords_num);
 
 }
 
-FloatBMElem **BKE_dsort_elems_from_cursor(BMesh *bm, int length, const char etype, int mitype, float (**coords)[3], ModifierData *md)
+FloatBMElem **dsort_elems_from_cursor(BMesh *bm, int length, const char etype, int mitype, float (**coords)[3], ModifierData *md)
 {
-	*coords = MEM_mallocN(sizeof(float)*3, "BKE_dsort_elems_from_cursor coords");
+	*coords = MEM_mallocN(sizeof(float)*3, "dsort_elems_from_cursor coords");
 
 	copy_v3_v3((*coords)[0], md->scene->cursor);
 
-	return BKE_dsort_elems_from_coords(bm, length, etype, mitype, *coords, 1);
+	return dsort_elems_from_coords(bm, length, etype, mitype, *coords, 1);
 }
 
-/* should */
-FloatBMElem *BKE_dsort_elems_from_weights(BMesh *bm, int length, const char etype, int mitype, int itype, Object *ob, char vgroup[])
+FloatBMElem *dsort_elems_from_weights(BMesh *bm, int length, const char etype, int mitype, int itype, Object *ob, char vgroup[])
 {
 	void *elem;
 	BMVert *vert;
@@ -540,7 +556,7 @@ FloatBMElem *BKE_dsort_elems_from_weights(BMesh *bm, int length, const char etyp
 	int i, count;
 	FloatBMElem *distances;
 
-	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "BKE_dsort_order_from_weights distances");
+	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "dsort_order_from_weights distances");
 
 	defgrp_index = defgroup_name_index(ob, vgroup);
 
@@ -564,175 +580,21 @@ FloatBMElem *BKE_dsort_elems_from_weights(BMesh *bm, int length, const char etyp
 		distances[i].fl = -weight;
 	}
 
-	qsort(distances, length, sizeof(FloatBMElem), BKE_dsort_compare_float_bm_elem);
+	qsort(distances, length, sizeof(FloatBMElem), dsort_compare_float_bm_elem);
 
 	printf("After weights sort");
 
 	return distances;
 }
 
-void BKE_set_centers_array_from_dm(DerivedMesh *dm, const char etype, float (**elems_centers)[3],int *elems_centers_length) {
-
-	int i;
-
-	if (etype == BM_FACE) {
-		MVert *vert_array;
-		MLoop *loop_array;
-		MPoly *poly;
-
-		*elems_centers_length = dm->numPolyData;
-		if (*elems_centers_length > 0) {
-			vert_array = dm->getVertArray(dm);
-			loop_array = dm->getLoopArray(dm);
-
-			poly = dm->getPolyArray(dm);
-			*elems_centers = MEM_mallocN(sizeof(float) * 3 * (*elems_centers_length), "BKE_get_centers_array_from_dm elems_centers");
-
-			for (i = 0; i < *elems_centers_length; i++, poly++)
-				BKE_mesh_calc_poly_center(poly, (loop_array + poly->loopstart), vert_array, (*elems_centers)[i]);
-
-			return;
-		}
-	}
-
-	if (etype == BM_EDGE) {
-		*elems_centers_length = dm->numEdgeData;
-		if (*elems_centers_length > 0) {
-			return;
-		}
-	}
-
-	if (etype == BM_VERT) {
-		*elems_centers_length = dm->numVertData;
-
-		return;
-	}
-
-	return;
-
-}
-
-/* need to be improved to work better with morph modifier */
-FloatBMElem *BKE_dsort_elems_from_object(BMesh *bm, int length, const char etype, int mitype, DerivedMesh *target_dm, short use_random, int seed)
-{
-
-	int i, ordered_i, j, temp;
-	void *elem, *closest_elem;
-	float center[3];
-	BMIter iter;
-	FloatBMElem *distances;
-
-	int *sort_order;
-	int iteration;
-	int target_i;
-	char extra_i;
-	float (*target_coords)[3];
-	int target_coords_length;
-	char *used_elems;
-	int closest_elem_i;
-	float current_dist, closest_dist;
-
-	float tempco1[3], tempco2[3];
-
-	/* calculating target coordinates */
-	BKE_set_centers_array_from_dm(target_dm, etype, &target_coords, &target_coords_length);
-
-	/* bool array determining if element is already assigned */
-	used_elems = MEM_callocN(sizeof(char) * length, "BKE_dsort_elems_from_object used_elems");
-
-	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "BKE_dsort_order_from_dm distances");
-
-	iteration = 0;
-
-	while (iteration <= 1) {
-
-		if (iteration == 0) {
-			/* sort order */
-			sort_order = MEM_mallocN(sizeof(int) * length, "BKE_dsort_elems_from_object sort_order");
-
-			for (i = 0; i < length; i++)
-				sort_order[i] = i;
-
-			if (use_random) {
-
-				printf("Randomizing sort order.\n");
-
-				srand(seed);
-				for (i = 0; i < length - 1; i++) {
-					j = i + (rand() % (length - i));
-					temp = sort_order[j];
-					sort_order[j] = sort_order[i];
-					sort_order[i] = temp;
-				}
-			}
-
-
-		}
-
-		for (i = 0; i < length; i++) {
-			ordered_i = sort_order[i];
-
-			target_i = (int)(((float)ordered_i / (float)length) * (float)target_coords_length);
-
-			if ((int)(((float)(ordered_i - 1) / (float)length) * (float)target_coords_length) == target_i)
-				extra_i = true;
-			else
-				extra_i = false;
-
-			if (iteration == 0 && extra_i)
-				continue;
-			else if (iteration == 1 && !extra_i)
-				continue;
-
-			closest_elem = NULL;
-			closest_elem_i = -1;
-			closest_dist = DSORT_FLT_MAX;
-
-			BM_ITER_MESH_INDEX(elem, &iter, bm, mitype, j) {
-				if (used_elems[j])
-					continue;
-
-				BKE_dsort_get_bm_elem_center(elem, etype, center);
-
-				current_dist = len_squared_v3v3(center, target_coords[target_i]);
-
-				if (current_dist < closest_dist) {
-					closest_elem = elem;
-					closest_elem_i = j;
-					closest_dist = current_dist;
-					copy_v3_v3(tempco1, center);
-					copy_v3_v3(tempco2, target_coords[target_i]);
-				}
-
-			}
-
-			/* distances[ordered_i].el = closest_elem; */
-			distances[ordered_i].el = closest_elem;
-
-			used_elems[closest_elem_i] = true;
-
-		}
-
-		iteration++;
-	}
-
-	MEM_freeN(sort_order);
-	MEM_freeN(target_coords);
-	MEM_freeN(used_elems);
-
-	return distances;
-
-}
-
-FloatBMElem *BKE_dsort_elems_randomize(BMesh *bm, int length, int mitype, int random_seed)
+FloatBMElem *dsort_elems_randomize(BMesh *bm, int length, int mitype, int random_seed)
 {
 	int i, j;
 	BMIter iter;
 	FloatBMElem *distances;
 	void *temp_elem;
-	int sort_order;
 
-	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "BKE_dsort_order_from_dm distances");
+	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "dsort_order_from_dm distances");
 
 	BM_ITER_MESH_INDEX(temp_elem, &iter, bm, mitype, i) {
 		distances[i].el = temp_elem;
@@ -749,14 +611,14 @@ FloatBMElem *BKE_dsort_elems_randomize(BMesh *bm, int length, int mitype, int ra
 	return distances;
 }
 
-FloatBMElem *BKE_dsort_elems_none(BMesh *bm, int length, int mitype)
+FloatBMElem *dsort_elems_none(BMesh *bm, int length, int mitype)
 {
 	int i;
 	BMIter iter;
 	void *elem;
 	FloatBMElem *distances;
 
-	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "BKE_dsort_elems_none distances");
+	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "dsort_elems_none distances");
 
 	BM_ITER_MESH_INDEX(elem, &iter, bm, mitype, i) {
 		distances[i].el = elem;
@@ -765,83 +627,73 @@ FloatBMElem *BKE_dsort_elems_none(BMesh *bm, int length, int mitype)
 	return distances;
 }
 
-void BKE_dsort_elems(ModifierData *md, Object *ob, BMesh *bm, int sort_type,
-				short use_original_mesh, short connected_first, float (**coords)[3], int *coords_num,
-				int axis, char vgroup[], Object *target_object, short use_random, int random_seed,
-				int **elems_order, int length,
+void dsort_elems(ModifierData *md,BMesh *bm, DSortSettings *settings,
+				int **p_elems_order, int length,
 				const char etype, int mitype, int itype, int iitype)
 {
 
-	int i;
+	int i, distances_num;
 	FloatBMElem **m_distances = NULL;
 	FloatBMElem *s_distances = NULL;
 
-	*elems_order = MEM_mallocN(sizeof(int) * length, "BKE_dsort_from_bm verts_order");
+	*p_elems_order = MEM_mallocN(sizeof(int) * length, "dsort_from_bm verts_order");
 
-	if (sort_type == MOD_SORT_TYPE_AXIS) {
-		*coords_num = 1;
-		s_distances = BKE_dsort_elems_from_axis(bm, length, etype, mitype, axis);
-	} else if (sort_type == MOD_SORT_TYPE_SELECTED) {
-		if (*coords != NULL)
-			m_distances = BKE_dsort_elems_from_coords(bm, length, etype, mitype, *coords, *coords_num);
+	if (settings->sort_type == DSORT_TYPE_AXIS) {
+		s_distances = dsort_elems_from_axis(bm, length, etype, mitype, settings->axis);
+		distances_num = 1;
+	} else if (settings->sort_type == DSORT_TYPE_SELECTED) {
+		if (settings->coords != NULL)
+			m_distances = dsort_elems_from_coords(bm, length, etype, mitype, settings->coords, settings->coords_num);
 		else
-			m_distances = BKE_dsort_elems_from_selected(bm, ob, length, etype, mitype, coords, coords_num, use_original_mesh);
-	} else if (sort_type == MOD_SORT_TYPE_CURSOR) {
-		if (*coords != NULL)
-			m_distances = BKE_dsort_elems_from_coords(bm, length, etype, mitype, *coords, *coords_num);
+			m_distances = dsort_elems_from_selected(bm, settings->object, length, etype, mitype, &settings->coords, &settings->coords_num, settings->use_original_mesh);
+		distances_num = settings->coords_num;
+	} else if (settings->sort_type == DSORT_TYPE_CURSOR) {
+		if (settings->coords != NULL)
+			m_distances = dsort_elems_from_coords(bm, length, etype, mitype, settings->coords, settings->coords_num);
 		else {
-			*coords_num = 1;
-			m_distances = BKE_dsort_elems_from_cursor(bm, length, etype, mitype, coords, md);
+			settings->coords_num = 1;
+			m_distances = dsort_elems_from_cursor(bm, length, etype, mitype, &settings->coords, md);
 		}
-	} else if (sort_type == MOD_SORT_TYPE_WEIGHTS) {
-		*coords_num = 1;
-		s_distances = BKE_dsort_elems_from_weights(bm, length, etype, mitype, itype, ob, vgroup);
-	} else if (sort_type == MOD_SORT_TYPE_OBJECT) {
-		DerivedMesh *target_dm;
-		*coords_num = 1;
-		target_dm = mesh_get_derived_final(md->scene, target_object, CD_MASK_MESH);
-		s_distances = BKE_dsort_elems_from_object(bm, length, etype, mitype, target_dm, use_random, random_seed);
-	} else if (sort_type == MOD_SORT_TYPE_RANDOM) {
-		s_distances = BKE_dsort_elems_randomize(bm, length, mitype, random_seed);
+		distances_num = settings->coords_num;
+	} else if (settings->sort_type == DSORT_TYPE_WEIGHTS) {
+		s_distances = dsort_elems_from_weights(bm, length, etype, mitype, itype, settings->object, settings->vgroup);
+		distances_num = 1;
+	} else if (settings->sort_type == DSORT_TYPE_RANDOM) {
+		s_distances = dsort_elems_randomize(bm, length, mitype, settings->random_seed);
+		distances_num = 1;
 	} else {
-		s_distances = BKE_dsort_elems_none(bm, length, mitype);
+		s_distances = dsort_elems_none(bm, length, mitype);
+		distances_num = 1;
 	}
 
 
-	if (*coords_num <= 1 && m_distances) {
-
+	if (distances_num <= 1 && m_distances) {
 		s_distances = m_distances[0];
-
 		MEM_freeN(m_distances);
-
 	}
 
-	if (*coords_num <= 1) {
-
-		if (!connected_first)
-			BKE_dsort_create_order_single_not_connected_first(*elems_order, length, etype, s_distances);
+	if (distances_num <= 1) {
+		if (!settings->connected_first)
+			dsort_create_order_single_not_connected_first(*p_elems_order, length, etype, s_distances);
 		else
-			BKE_dsort_create_order_single_connected_first(*elems_order, length, etype, itype, iitype, s_distances);
+			dsort_create_order_single_connected_first(*p_elems_order, length, etype, itype, iitype, s_distances);
 
 		MEM_freeN(s_distances);
-
 	} else {
-
-		if (!connected_first)
-			BKE_dsort_create_order_multiple_not_connected_first(*elems_order, length, etype, m_distances, *coords_num);
+		if (!settings->connected_first)
+			dsort_create_order_multiple_not_connected_first(*p_elems_order, length, etype, m_distances, distances_num);
 		else
-			BKE_dsort_create_order_multiple_connected_first(*elems_order, length, etype, itype, iitype, m_distances, *coords_num);
+			dsort_create_order_multiple_connected_first(*p_elems_order, length, etype, itype, iitype, m_distances, distances_num);
 
-		for(i=0; i<*coords_num; i++)
+		for(i = 0; i < distances_num; i++)
 			MEM_freeN(((FloatBMElem **)m_distances)[i]);
 
 		MEM_freeN(m_distances);
-
 	}
 
 }
 
-int BKE_dsort_get_new_index(int *elems_order, int length, int old_index)
+int dsort_get_new_index(int *elems_order, int length, int old_index)
 {
 	int i;
 
@@ -852,7 +704,7 @@ int BKE_dsort_get_new_index(int *elems_order, int length, int old_index)
 	return -1;
 }
 
-void BKE_dsort_elems_from_elems(BMesh *bm, int **elems_order, int length, int *elems_from_order, int from_length,
+void dsort_elems_from_elems(BMesh *bm, int **p_elems_order, int length, int *elems_from_order, int from_length,
 								const char etype, const char eftype, int itype)
 {
 	void *elem_from, *elem;
@@ -860,17 +712,17 @@ void BKE_dsort_elems_from_elems(BMesh *bm, int **elems_order, int length, int *e
 	int i, order_i, elem_i, elem_from_i;
 	char *used_elems;
 
-	*elems_order = MEM_mallocN(sizeof(int) * length, "BKE_dsort_elems_from_elems elems_order");
-	used_elems = MEM_callocN(sizeof(char) * length, "BKE_dsort_elems_from_elems used_elems");
+	*p_elems_order = MEM_mallocN(sizeof(int) * length, "dsort_elems_from_elems elems_order");
+	used_elems = MEM_callocN(sizeof(char) * length, "dsort_elems_from_elems used_elems");
 
 	order_i = 0;
 	for (i = 0; i < from_length; i++) {
-		elem_from_i = BKE_dsort_get_new_index(elems_from_order, from_length, i);
-		elem_from = BKE_dsort_bm_elem_at_index(bm, eftype, elem_from_i);
+		elem_from_i = dsort_get_new_index(elems_from_order, from_length, i);
+		elem_from = dsort_bm_elem_at_index(bm, eftype, elem_from_i);
 		BM_ITER_ELEM(elem, &iter, elem_from, itype) {
 			elem_i = BKE_dsort_get_bm_elem_index(elem, etype);
 			if (!used_elems[elem_i]) {
-				(*elems_order)[elem_i] = order_i;
+				(*p_elems_order)[elem_i] = order_i;
 				order_i++;
 				used_elems[elem_i] = true;
 			}
@@ -881,68 +733,207 @@ void BKE_dsort_elems_from_elems(BMesh *bm, int **elems_order, int length, int *e
 
 }
 
-void BKE_dsort_edges_from_verts(BMesh *bm, int **edges_order, int *verts_order)
+void dsort_edges_from_verts(BMesh *bm, int **edges_order, int *verts_order)
 {
-	BKE_dsort_elems_from_elems(bm, edges_order, bm->totedge, verts_order, bm->totvert,
+	dsort_elems_from_elems(bm, edges_order, bm->totedge, verts_order, bm->totvert,
 								BM_EDGE, BM_VERT, BM_EDGES_OF_VERT);
 }
 
-void BKE_dsort_faces_from_verts(BMesh *bm, int **faces_order, int *verts_order)
+void dsort_faces_from_verts(BMesh *bm, int **faces_order, int *verts_order)
 {
-	BKE_dsort_elems_from_elems(bm, faces_order, bm->totface, verts_order, bm->totvert,
+	dsort_elems_from_elems(bm, faces_order, bm->totface, verts_order, bm->totvert,
 								BM_FACE, BM_VERT, BM_FACES_OF_VERT);
 }
 
-void BKE_dsort_faces_from_edges(BMesh *bm, int **faces_order, int *edges_order)
+void dsort_faces_from_edges(BMesh *bm, int **faces_order, int *edges_order)
 {
-	BKE_dsort_elems_from_elems(bm, faces_order, bm->totface, edges_order, bm->totedge,
+	dsort_elems_from_elems(bm, faces_order, bm->totface, edges_order, bm->totedge,
 								BM_FACE, BM_EDGE, BM_FACES_OF_EDGE);
 }
 
-void dsort_from_bm(ModifierData *md, Object *ob, BMesh *bm, int sort_type,
-					short use_original_mesh, short connected_first, float (**coords)[3], int *coords_num,
-					int axis, char vgroup[], Object *target_object, short use_random, int random_seed,
-					int **verts_order, int **edges_order, int **faces_order, int **loops_order,
-					short sort_verts, short sort_edges, short sort_faces, short sort_loops)
+void dsort_reverse_order(int *elems_order, int length)
 {
+	int i, i_left, i_right, temp_length;
+	int temp;
 
-	printf("Started sorting\n");
+	temp_length = (int)length / 2;
+	for(i = 0; i < temp_length; i++) {
+		i_left = dsort_get_new_index(elems_order, length, i);
+		i_right = dsort_get_new_index(elems_order, length, length - 1 - i);
+		temp = elems_order[i_left];
+		elems_order[i_left] = elems_order[i_right];
+		elems_order[i_right] = temp;
+	}
+}
 
-	if (sort_verts) {
-		BKE_dsort_elems(md, ob, bm, sort_type,
-						use_original_mesh, connected_first, coords, coords_num,
-						axis, vgroup, target_object, use_random, random_seed,
-						verts_order, bm->totvert,
-						BM_VERT, BM_VERTS_OF_MESH, BM_EDGES_OF_VERT, BM_VERTS_OF_EDGE);
+void BKE_dsort_set_elems_order(ModifierData *md, BMesh *bm, DSortSettings *settings,
+					int **p_verts_order, int **p_edges_order, int **p_faces_order)
+{
+	if (settings->sort_elems & DSORT_ELEMS_VERTS) {
+		dsort_elems(md, bm, settings,
+					p_verts_order, bm->totvert,
+					BM_VERT, BM_VERTS_OF_MESH, BM_EDGES_OF_VERT, BM_VERTS_OF_EDGE);
 	}
 
 
-	if (sort_edges) {
-		if (sort_verts)
-			BKE_dsort_edges_from_verts(bm, edges_order, *verts_order);
+	if (settings->sort_elems & DSORT_ELEMS_EDGES) {
+		if (*p_verts_order)
+			dsort_edges_from_verts(bm, p_edges_order, *p_verts_order);
 		else {
-			BKE_dsort_elems(md, ob, bm, sort_type,
-							use_original_mesh, connected_first, coords, coords_num,
-							axis, vgroup, target_object, use_random, random_seed,
-							edges_order, bm->totedge,
-							BM_EDGE, BM_EDGES_OF_MESH, BM_VERTS_OF_EDGE, BM_EDGES_OF_VERT);
+			dsort_elems(md, bm, settings,
+						p_edges_order, bm->totedge,
+						BM_EDGE, BM_EDGES_OF_MESH, BM_VERTS_OF_EDGE, BM_EDGES_OF_VERT);
 		}
 	}
 
 
-	if (sort_faces) {
-		if (sort_verts)
-			BKE_dsort_faces_from_verts(bm, faces_order, *verts_order);
-		else if (sort_edges)
-			BKE_dsort_edges_from_verts(bm, faces_order, *edges_order);
+	if (settings->sort_elems & DSORT_ELEMS_FACES) {
+		if (*p_verts_order)
+			dsort_faces_from_verts(bm, p_faces_order, *p_verts_order);
+		else if (*p_edges_order)
+			dsort_edges_from_verts(bm, p_faces_order, *p_edges_order);
 		else {
-			BKE_dsort_elems(md, ob, bm, sort_type,
-							use_original_mesh, connected_first, coords, coords_num,
-							axis, vgroup, target_object, use_random, random_seed,
-							faces_order, bm->totface,
-							BM_FACE, BM_FACES_OF_MESH, BM_VERTS_OF_FACE, BM_FACES_OF_VERT);
+			dsort_elems(md, bm, settings,
+						p_faces_order, bm->totface,
+						BM_FACE, BM_FACES_OF_MESH, BM_VERTS_OF_FACE, BM_FACES_OF_VERT);
 		}
+	}
+
+	/* reverse order if necessary */
+	if (settings->reverse) {
+		if (settings->sort_elems & DSORT_ELEMS_VERTS)
+			dsort_reverse_order(*p_verts_order, bm->totvert);
+		if (settings->sort_elems & DSORT_ELEMS_EDGES)
+			dsort_reverse_order(*p_edges_order, bm->totedge);
+		if (settings->sort_elems & DSORT_ELEMS_FACES)
+			dsort_reverse_order(*p_faces_order, bm->totface);
 	}
 
 }
 
+void BKE_dsort_free_elems_order(int **p_verts_order, int **p_edges_order, int **p_faces_order)
+{
+	int *verts_order = p_verts_order ? *p_verts_order : NULL;
+	int *edges_order = p_edges_order ? *p_edges_order : NULL;
+	int *faces_order = p_faces_order ? *p_faces_order : NULL;
+
+	if (verts_order) {
+		MEM_freeN(verts_order);
+		verts_order = NULL;
+	}
+
+	if (edges_order) {
+		MEM_freeN(edges_order);
+		edges_order = NULL;
+	}
+
+	if (faces_order) {
+		MEM_freeN(faces_order);
+		faces_order = NULL;
+	}
+}
+
+void BKE_dsort_free_data(DSortSettings *settings,
+						 int **p_verts_order, int **p_edges_order, int **p_faces_order,
+						 short *is_sorted, short *initiate_sort)
+{
+	BKE_dsort_free_elems_order(p_verts_order, p_edges_order, p_faces_order);
+
+	if (settings->coords) {
+		MEM_freeN(settings->coords);
+		settings->coords = NULL;
+	}
+
+	*is_sorted = false;
+	*initiate_sort = false;
+}
+
+char BKE_dsort_bm(ModifierData *md, BMesh *bm, DSortSettings *settings,
+			int **p_verts_order, int **p_edges_order, int **p_faces_order, int **p_loops_order,
+			int *p_verts_length, int *p_edges_length, int *p_faces_length, int *p_loops_length,
+			short *is_sorted, short *initiate_sort, short auto_refresh)
+{
+	char order_changed = false;
+
+	int *verts_order = p_verts_order ? *p_verts_order : NULL;
+	int *edges_order = p_edges_order ? *p_edges_order : NULL;
+	int *faces_order = p_faces_order ? *p_faces_order : NULL;
+
+	int verts_length = p_verts_length ? *p_verts_length : 0;
+	int edges_length = p_edges_length ? *p_edges_length : 0;
+	int faces_length = p_faces_length ? *p_faces_length : 0;
+
+	if (!(*initiate_sort)) {
+		if (!(*is_sorted))
+			return false;
+		else {
+		/* if mesh has changed free elems order */	
+			if (((settings->sort_elems & DSORT_ELEMS_VERTS) && !(verts_order)) ||
+				((settings->sort_elems & DSORT_ELEMS_EDGES) && !(edges_order)) ||
+				((settings->sort_elems & DSORT_ELEMS_FACES) && !(faces_order)) ||
+				(verts_order && verts_length != bm->totvert) ||
+				(edges_order && edges_length != bm->totedge) ||
+				(faces_order && faces_length != bm->totface)) {
+					BKE_dsort_free_elems_order(p_verts_order, p_edges_order, p_faces_order);
+
+					*is_sorted = false;
+					if (auto_refresh)
+						*initiate_sort = true;
+					else
+						return true;
+			}
+		}
+	}
+
+	/* Get new sort order. */
+	if (*initiate_sort && (settings->sort_elems)) {
+		BKE_dsort_set_elems_order((ModifierData *)md, bm, settings,
+						p_verts_order, p_edges_order, p_faces_order);
+
+		if (verts_order) {
+			*p_verts_length = bm->totvert;
+			*is_sorted = true;
+		}
+
+		if (edges_order) {
+			*p_edges_length = bm->totedge;
+			*is_sorted = true;
+		}
+
+		if (faces_order) {
+			*p_faces_length = bm->totface;
+			*is_sorted = true;
+		}
+
+		*initiate_sort = false;
+		order_changed = true;
+	}
+
+	/* Remap mesh if it's needed. */
+	if (settings->sort_type != DSORT_TYPE_NONE)
+		BM_mesh_remap(bm, verts_order, edges_order, faces_order);
+
+	return order_changed;
+}
+
+void BKE_copy_dsort_settings(DSortSettings *dss, DSortSettings *tdss)
+{
+	tdss->coords_num = dss->coords_num;
+
+	if (dss->coords_num > 0) {
+		tdss->coords = MEM_mallocN(sizeof(float)*3*dss->coords_num, "MOD_sort coords");
+		memcpy(tdss->coords, dss->coords, sizeof(float)*3*dss->coords_num);
+	} else
+		tdss->coords = NULL;
+
+	BLI_strncpy(tdss->vgroup, dss->vgroup, sizeof(tdss->vgroup));
+
+	tdss->sort_type = dss->sort_type;
+	tdss->axis = dss->axis;
+	tdss->use_original_mesh = dss->use_original_mesh;
+
+	tdss->random_seed = dss->random_seed;
+
+	tdss->connected_first = dss->connected_first;
+	tdss->sort_elems = dss->sort_elems;
+}
