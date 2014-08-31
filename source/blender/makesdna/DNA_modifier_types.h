@@ -82,7 +82,7 @@ typedef enum ModifierType {
 	eModifierType_MeshCache         = 46,
 	eModifierType_LaplacianDeform   = 47,
 	eModifierType_Wireframe         = 48,
-    eModifierType_Sort         = 49,
+    eModifierType_Sort              = 49,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -1364,21 +1364,19 @@ enum {
 };
 
 typedef struct SortModifierData {
-
 	ModifierData modifier;
 
-	/* settings in DNA_dsort_types.h */
-	struct DSortSettings *settings;
+	struct DSortSettings *settings; /* basic settings */
 
 	/* cache */
-	int *faces_order;
-	int *edges_order;
 	int *verts_order;
+	int *edges_order;
+	int *faces_order;
 
 	/* to check if mesh changed */
-	int faces_length;
-	int edges_length;
 	int verts_length;
+	int edges_length;
+	int faces_length;
 
 	short initiate_sort;
 	short is_sorted;
@@ -1386,6 +1384,7 @@ typedef struct SortModifierData {
 	short auto_refresh;
 
 	short pad1;
+	int pad2;
 } SortModifierData;
 
 
