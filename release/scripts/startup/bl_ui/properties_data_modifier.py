@@ -852,56 +852,56 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         split = box.split()
         col = split.column()
         col.label(text="Sort Type:")
-        col.prop(md, "sort_type", text="")
+        col.prop(md.settings, "sort_type", text="")
         
-        if (md.sort_type == 'AXIS'):
+        if (md.settings.sort_type == 'AXIS'):
             split = box.split()
             split.active = not is_sorted
             col = split.column()
             col.label(text="Axis:")
             col = split.column()
-            col.prop(md, "axis", text="")   
-        elif (md.sort_type == "SELECTED"):
+            col.prop(md.settings, "axis", text="")   
+        elif (md.settings.sort_type == "SELECTED"):
             split = box.split()
             split.active = not is_sorted
             col = split.column()
-            col.prop(md, 'use_original_mesh')
-        elif (md.sort_type == "WEIGHTS"):
+            col.prop(md.settings, 'use_original_mesh')
+        elif (md.settings.sort_type == "WEIGHTS"):
             split = box.split()
             split.active = not is_sorted
             col = split.column()
             col.label(text="Vertex Group:")
-            col.prop_search(md, "vgroup", ob, "vertex_groups", text="")
-        elif (md.sort_type == "OBJECT"):
+            col.prop_search(md.settings, "vgroup", ob, "vertex_groups", text="")
+        elif (md.settings.sort_type == "OBJECT"):
             split = box.split()
             split.active = not is_sorted
             col = split.column()
             row = col.row()
             row.label(text="Object:")
-            row.prop(md, "target_object", text="")
+            row.prop(md.settings, "target_object", text="")
             row = col.row()
             col = row.column()
-            col.prop(md, "use_random", text="Randomize")
+            col.prop(md.settings, "use_random", text="Randomize")
             col = row.column()
-            if (md.use_random):
-                col.prop(md, "random_seed", text="Seed")
+            if (md.settings.use_random):
+                col.prop(md.settings, "random_seed", text="Seed")
 
         split = box.split()
         col = split.column()    
-        col.prop(md, 'connected_first', text='Connected First')
+        col.prop(md.settings, 'connected_first', text='Connected First')
         
         split = box.split()
         split.label(text="Sort:")
         
         split = box.split()
         col = split.column()
-        col.prop(md, 'sort_faces', text='Faces')
+        col.prop(md.settings, 'sort_faces', text='Faces')
         col = split.column()
-        col.prop(md, 'sort_verts', text='Verts')
+        col.prop(md.settings, 'sort_verts', text='Verts')
         
         split = box.split()
         col = split.column()
-        col.prop(md, 'sort_edges', text='Edges')
+        col.prop(md.settings, 'sort_edges', text='Edges')
         col = split.column()
         
         

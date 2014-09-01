@@ -140,11 +140,11 @@ void *dsort_bm_elem_at_index(BMesh *bm, const char etype, const int index)
 {
 	switch (etype) {
 		case BM_VERT:
-			return (void *)BM_vert_at_index(bm, index);
+			return (void *)BM_vert_at_index_find(bm, index);
 		case BM_EDGE:
-			return (void *)BM_edge_at_index(bm, index);
+			return (void *)BM_edge_at_index_find(bm, index);
 		case BM_FACE:
-			return (void *)BM_face_at_index(bm, index);
+			return (void *)BM_face_at_index_find(bm, index);
 		default:
 			return NULL;
 	}
@@ -545,7 +545,7 @@ FloatBMElem **dsort_elems_from_cursor(BMesh *bm, int length, const char etype, i
 	return dsort_elems_from_coords(bm, length, etype, mitype, *coords, 1);
 }
 
-FloatBMElem *dsort_elems_from_weights(BMesh *bm, int length, const char etype, int mitype, int itype, Object *ob, char vgroup[])
+FloatBMElem *dsort_elems_from_weights(BMesh *bm, int length, const char etype, int mitype, int itype, Object *ob, short vgroup)
 {
 	void *elem;
 	BMVert *vert;
@@ -558,7 +558,7 @@ FloatBMElem *dsort_elems_from_weights(BMesh *bm, int length, const char etype, i
 
 	distances = MEM_mallocN(sizeof(FloatBMElem) * length, "dsort_order_from_weights distances");
 
-	defgrp_index = defgroup_name_index(ob, vgroup);
+	defgrp_index = vgroup;
 
 	BM_ITER_MESH_INDEX(elem, &iter, bm, mitype, i) {
 		if (etype == BM_VERT) {
@@ -581,8 +581,6 @@ FloatBMElem *dsort_elems_from_weights(BMesh *bm, int length, const char etype, i
 	}
 
 	qsort(distances, length, sizeof(FloatBMElem), dsort_compare_float_bm_elem);
-
-	printf("After weights sort");
 
 	return distances;
 }
@@ -697,19 +695,20 @@ int dsort_get_new_index(int *elems_order, int length, int old_index)
 {
 	int i;
 
-	for(i = 0; i < length; i++)
+	for (i = 0; i < length; i++) {
 		if (elems_order[i] == old_index)
 			return i;
+	}
 
 	return -1;
 }
 
 void dsort_elems_from_elems(BMesh *bm, int **p_elems_order, int length, int *elems_from_order, int from_length,
-								const char etype, const char eftype, int itype)
+								const char etype, const char from_etype, int itype)
 {
-	void *elem_from, *elem;
+	void *from_elem, *elem;
 	BMIter iter;
-	int i, order_i, elem_i, elem_from_i;
+	int i, order_i, elem_i, from_elem_i;
 	char *used_elems;
 
 	*p_elems_order = MEM_mallocN(sizeof(int) * length, "dsort_elems_from_elems elems_order");
@@ -717,9 +716,9 @@ void dsort_elems_from_elems(BMesh *bm, int **p_elems_order, int length, int *ele
 
 	order_i = 0;
 	for (i = 0; i < from_length; i++) {
-		elem_from_i = dsort_get_new_index(elems_from_order, from_length, i);
-		elem_from = dsort_bm_elem_at_index(bm, eftype, elem_from_i);
-		BM_ITER_ELEM(elem, &iter, elem_from, itype) {
+		from_elem_i = dsort_get_new_index(elems_from_order, from_length, i);
+		from_elem = dsort_bm_elem_at_index(bm, from_etype, from_elem_i);
+		BM_ITER_ELEM(elem, &iter, from_elem, itype) {
 			elem_i = BKE_dsort_get_bm_elem_index(elem, etype);
 			if (!used_elems[elem_i]) {
 				(*p_elems_order)[elem_i] = order_i;
@@ -767,7 +766,7 @@ void dsort_reverse_order(int *elems_order, int length)
 }
 
 void BKE_dsort_set_elems_order(ModifierData *md, BMesh *bm, DSortSettings *settings,
-					int **p_verts_order, int **p_edges_order, int **p_faces_order)
+								int **p_verts_order, int **p_edges_order, int **p_faces_order)
 {
 	if (settings->sort_elems & DSORT_ELEMS_VERTS) {
 		dsort_elems(md, bm, settings,
@@ -853,8 +852,6 @@ char BKE_dsort_bm(ModifierData *md, BMesh *bm, DSortSettings *settings,
 					int *p_verts_length, int *p_edges_length, int *p_faces_length, int *p_loops_length,
 					short *is_sorted, short *initiate_sort, short auto_refresh)
 {
-	printf("%d\n", initiate_sort);
-
 	char order_changed = false;
 
 	int *verts_order = p_verts_order ? *p_verts_order : NULL;
@@ -889,20 +886,24 @@ char BKE_dsort_bm(ModifierData *md, BMesh *bm, DSortSettings *settings,
 
 	/* Get new sort order. */
 	if (*initiate_sort && (settings->sort_elems)) {
-		BKE_dsort_set_elems_order((ModifierData *)md, bm, settings,
-						p_verts_order, p_edges_order, p_faces_order);
+		*p_verts_order = NULL;
+		*p_edges_order = NULL;
+		*p_faces_order = NULL;
 
-		if (verts_order) {
+		BKE_dsort_set_elems_order((ModifierData *)md, bm, settings,
+			p_verts_order, p_edges_order, p_faces_order);
+
+		if (*p_verts_order) {
 			*p_verts_length = bm->totvert;
 			*is_sorted = true;
 		}
 
-		if (edges_order) {
+		if (*p_edges_order) {
 			*p_edges_length = bm->totedge;
 			*is_sorted = true;
 		}
 
-		if (faces_order) {
+		if (*p_faces_order) {
 			*p_faces_length = bm->totface;
 			*is_sorted = true;
 		}
@@ -910,6 +911,10 @@ char BKE_dsort_bm(ModifierData *md, BMesh *bm, DSortSettings *settings,
 		*initiate_sort = false;
 		order_changed = true;
 	}
+
+	verts_order = p_verts_order ? *p_verts_order : NULL;
+	edges_order = p_edges_order ? *p_edges_order : NULL;
+	faces_order = p_faces_order ? *p_faces_order : NULL;
 
 	/* Remap mesh if it's needed. */
 	if (settings->sort_type != DSORT_TYPE_NONE)
@@ -928,7 +933,7 @@ void BKE_copy_dsort_settings(DSortSettings *dss, DSortSettings *tdss)
 	} else
 		tdss->coords = NULL;
 
-	BLI_strncpy(tdss->vgroup, dss->vgroup, sizeof(tdss->vgroup));
+	tdss->vgroup = dss->vgroup;
 
 	tdss->sort_type = dss->sort_type;
 	tdss->axis = dss->axis;

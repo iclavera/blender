@@ -1383,10 +1383,15 @@ typedef struct SortModifierData {
 
 	short auto_refresh;
 
-	short pad1;
-	int pad2;
+	short pad1; /* for future use */
+	int ui_info;
 } SortModifierData;
 
-
+enum {
+	MOD_SORT_NONE = 0,
+	MOD_SORT_VERTS = 1,
+	MOD_SORT_EDGES = 2,
+	MOD_SORT_FACES = 4
+};
 
 #endif  /* __DNA_MODIFIER_TYPES_H__ */

@@ -77,7 +77,7 @@
 #include "bmesh.h"
 
 
-static EnumPropertyItem *sort_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
+static EnumPropertyItem *sort_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
 {
 	Object *ob = CTX_data_edit_object(C);
 	EnumPropertyItem tmp = {0, "", 0, "", ""};
@@ -99,7 +99,7 @@ static EnumPropertyItem *sort_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), Pr
 	}
 
 	RNA_enum_item_end(&item, &totitem);
-	*free = 1;
+	*r_free = true;
 
 	return item;
 }
@@ -159,7 +159,7 @@ void OBJECT_OT_dsort(wmOperatorType *ot)
 
 	/* properties */
 	prop = RNA_def_enum(ot->srna, "modifier", DummyRNA_NULL_items, 0, "Modifier", "Modifier number to assign to");
-	RNA_def_enum_funcs(prop, sort_mod_itemf);
+	RNA_def_enum_funcs(prop, *sort_mod_itemf);
 }
 
 static int object_dsort_free_exec(bContext *C, wmOperator *op)

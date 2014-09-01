@@ -39,15 +39,17 @@ int BKE_dsort_get_bm_elems_length(struct BMesh *bm, const char etype);
 
 /* Used by morph.c and Sort Modifier */
 void BKE_dsort_set_elems_order(struct ModifierData *md, struct BMesh *bm,  struct DSortSettings *settings,
-			int **verts_order, int **edges_order, int **faces_order);
+								int **p_verts_order, int **p_edges_order, int **p_faces_order);
 
-void BKE_dsort_free_elems_order(int **verts_order, int **edges_order, int **faces_order);
-void BKE_dsort_free_data( struct DSortSettings *settings, int **verts_order, int **edges_order, int **faces_order, short *is_sorted, short *initiate_sort);
+void BKE_dsort_free_elems_order(int **p_verts_order, int **p_edges_order, int **p_faces_order);
+void BKE_dsort_free_data(struct DSortSettings *settings, 
+							int **p_verts_order, int **p_edges_order, int **p_faces_order, 
+							short *is_sorted, short *initiate_sort);
 
 char BKE_dsort_bm(struct ModifierData *md, struct BMesh *bm, struct DSortSettings *settings,
-			int **p_verts_order, int **p_edges_order, int **p_faces_order,
-			int *p_verts_length, int *p_edges_length, int *p_faces_length, int *loops_length,
-			short *is_sorted, short *initiate_sort, short auto_refresh);
+	int **p_verts_order, int **p_edges_order, int **p_faces_order, int **p_loops_order,
+	int *p_verts_length, int *p_edges_length, int *p_faces_length, int *p_loops_length,
+	short *is_sorted, short *initiate_sort, short auto_refresh);
 
 void BKE_copy_dsort_settings(struct DSortSettings *dss, struct DSortSettings *tdss);
 

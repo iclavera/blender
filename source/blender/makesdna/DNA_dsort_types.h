@@ -37,20 +37,15 @@
  * idea as they are used both in Sort Modifier and Morph Modifier.
 */
 
-typedef struct DSortSettings {
-	/* Object reference */
-	struct Object *object;
-	/* need to be cached is auto_refresh is on */
-	float (*coords)[3];
-
-	char vgroup[64];
+typedef struct DSortSettings {	
+	struct Object *object; /* Object reference */
+	float (*coords)[3]; /* needs to be cached if auto_refresh is on */
 
 	int coords_num;
 	/* generall settings */
 	int sort_type;
 	short reverse;
-	/* future use? */
-	short pad1;
+	short pad1; /* for future use */
 
 	/* for DSORT_TYPE_AXIS */
 	int axis;
@@ -59,10 +54,11 @@ typedef struct DSortSettings {
 	/* for DSORT_TYPE_SELECTED */
 	short use_original_mesh;
 	short connected_first;
+	/* for DSORT_TYPE_WEIGHTS */
+	short vgroup;
+	short pad2; /* for future use */
 
 	int sort_elems;
-
-	int pad2;
 } DSortSettings;
 
 enum {

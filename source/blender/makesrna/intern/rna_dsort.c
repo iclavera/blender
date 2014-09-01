@@ -61,23 +61,25 @@ static char *rna_DSortSettings_path(PointerRNA *ptr)
 	}
 }
 
-static void rna_DSort_vgroup_set(PointerRNA *ptr, const char *value)
+static void rna_DSortSettings_vgroup_get(PointerRNA *ptr, char *value)
 {
 	DSortSettings *dss = (DSortSettings *)ptr->data;
-
-	Object *ob = dss->object;
-	if (ob) {
-		bDeformGroup *dg = defgroup_find_name(ob, value);
-		if (dg) {
-			BLI_strncpy(dss->vgroup, value, sizeof(dss->vgroup)); /* no need for BLI_strncpy_utf8, since this matches an existing group */
-			return;
-		}
-	}
-
-	dss->vgroup[0] = '\0';
+	rna_object_vgroup_name_index_get(ptr, value, dss->vgroup);
 }
 
-static void rna_DSort_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static int rna_DSortSettings_vgroup_length(PointerRNA *ptr)
+{
+	DSortSettings *dss = (DSortSettings *)ptr->data;
+	return rna_object_vgroup_name_index_length(ptr, dss->vgroup);
+}
+
+static void rna_DSortSettings_vgroup_set(PointerRNA *ptr, const char *value)
+{
+	DSortSettings *dss = (DSortSettings *)ptr->data;
+	rna_object_vgroup_name_index_set(ptr, value, &dss->vgroup);
+}
+
+static void rna_DSortSettings_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	Object *ob = (Object *)ptr->id.data;
 
@@ -114,57 +116,58 @@ static void rna_def_dsort_settings(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "DSortSettings");
 	RNA_def_struct_path_func(srna, "rna_DSortSettings_path");
 
-	prop = RNA_def_property(srna, "vgroup", PROP_STRING, PROP_NONE);
-	RNA_def_property_string_sdna(prop, NULL, "vgroup");
-	RNA_def_property_ui_text(prop, "Vertex Group", "Name of Vertex Group to sort from");
-	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_DSort_vgroup_set");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
-
 	prop = RNA_def_property(srna, "sort_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, prop_sort_type_items);
 	RNA_def_property_ui_text(prop, "Sort Type", "Sort Type");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "reverse", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "reverse", 1);
 	RNA_def_property_ui_text(prop, "Reverse", "Reverse sort order.");
-	RNA_def_property_update(prop, 0, "rna_SortModifier_free_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "axis", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, prop_axis_items);
 	RNA_def_property_ui_text(prop, "Axis", "Sort on axis");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "use_original_mesh", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_original_mesh", 1);
 	RNA_def_property_ui_text(prop, "Use Original Mesh", "Use selected elements from original mesh.");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "connected_first", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "connected_first", 1);
 	RNA_def_property_ui_text(prop, "Connected First", "Connected First");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "random_seed", PROP_INT, PROP_UNSIGNED);
 	RNA_def_property_int_sdna(prop, NULL, "random_seed");
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop, "Random Seed", "Seed of the random generator");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "sort_verts", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "sort_elems", DSORT_ELEMS_VERTS);
 	RNA_def_property_ui_text(prop, "Sort Verts", "Sort Verts");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "sort_edges", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "sort_elems", DSORT_ELEMS_EDGES);
 	RNA_def_property_ui_text(prop, "Sort Edges", "Sort Edges");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 
 	prop = RNA_def_property(srna, "sort_faces", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "sort_elems", DSORT_ELEMS_FACES);
 	RNA_def_property_ui_text(prop, "Sort Faces", "Sort Faces");
-	RNA_def_property_update(prop, 0, "rna_DSort_update");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
+
+	prop = RNA_def_property(srna, "vgroup", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, "rna_DSortSettings_vgroup_get",
+		"rna_DSortSettings_vgroup_length",
+		"rna_DSortSettings_vgroup_set");
+	RNA_def_property_ui_text(prop, "Vertex Group", "Name of Vertex Group to sort from");
+	RNA_def_property_update(prop, 0, "rna_DSortSettings_update");
 }
 
 void RNA_def_dsort(BlenderRNA *brna)

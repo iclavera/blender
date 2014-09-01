@@ -52,7 +52,7 @@
 static void SortModifier_initDSortSettings(DSortSettings *dss)
 {
 	dss->coords = NULL;
-	dss->vgroup[0] = '\0';
+	dss->vgroup = 0;
 
 	dss->coords_num = 0;
 
@@ -75,7 +75,6 @@ static void SortModifier_initDSortSettings(DSortSettings *dss)
 
 static void initData(ModifierData *md)
 {
-	printf("Jej.\n");
 	SortModifierData *smd = (SortModifierData *) md;
 
 	smd->settings = MEM_callocN(sizeof(DSortSettings), "SortModifier settings");
@@ -131,17 +130,17 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tsmd->initiate_sort = true;
 }
 
-static int isDisabled(ModifierData *md, int UNUSED(useRenderParams))
+static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 {
 	SortModifierData *smd = (SortModifierData *)md;
 
 	if (smd->is_sorted || smd->initiate_sort)
-		return 0;
+		return false;
 
 	if (smd->settings->sort_type == DSORT_TYPE_WEIGHTS)
-		return !smd->settings->vgroup[0];
+		return !(bool)smd->settings->vgroup;
 
-	return 0;
+	return false;
 }
 
 static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
@@ -151,7 +150,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 
 	dataMask = 0;
 
-	if (smd->settings->vgroup[0])
+	if (smd->settings->vgroup)
 		dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
@@ -167,55 +166,68 @@ static DerivedMesh *SortModifier_do(ModifierData *md, Object *ob, DerivedMesh *d
 
 	bm = DM_to_bmesh(dm, false);
 
-	printf("Test: %d\n", &smd->initiate_sort);
+	BKE_dsort_bm(md, bm, smd->settings,
+					&smd->verts_order, &smd->edges_order, &smd->faces_order, NULL,
+					&smd->verts_length, &smd->edges_length, &smd->faces_length, NULL,
+					&smd->is_sorted, &smd->initiate_sort, smd->auto_refresh);
 
-	if (!BKE_dsort_bm(md, bm, smd->settings,
-				&smd->verts_order, &smd->edges_order, &smd->faces_order,
-				&smd->verts_length, &smd->edges_length, &smd->faces_length, NULL,
-				&smd->is_sorted, &smd->initiate_sort, smd->auto_refresh)) {
+	if (!smd->is_sorted) {
 		BM_mesh_free(bm);
-
 		return dm;
 	}
-	
+
+	smd->ui_info = MOD_SORT_NONE;
+
+	if (smd->is_sorted) {
+		if (smd->verts_order)
+			smd->ui_info |= MOD_SORT_VERTS;
+		if (smd->edges_order)
+			smd->ui_info |= MOD_SORT_EDGES;
+		if (smd->verts_order)
+			smd->ui_info |= MOD_SORT_FACES;
+	}
+
 	result = CDDM_from_bmesh(bm, false);
 	BM_mesh_free(bm);
 	return result;
 }
 
 static DerivedMesh *applyModifier(ModifierData *md, struct Object *ob,
-		DerivedMesh *derivedData, int useRenderParams, int isFinalCalc)
+									DerivedMesh *derivedData, ModifierApplyFlag UNUSED(flag))
 {
 	return SortModifier_do(md, ob, derivedData);
 }
 
 static DerivedMesh *applyModifierEm(ModifierData *md, struct Object *ob,
-		struct EditMesh *editData, struct DerivedMesh *derivedData)
+									struct BMEditMesh *UNUSED(editData), struct DerivedMesh *derivedData,
+									ModifierApplyFlag UNUSED(flag))
 {
 	return SortModifier_do(md, ob, derivedData);
 }
 
 ModifierTypeInfo modifierType_Sort = {
-/* name */"Sort",
-/* structName */"SortModifierData",
-/* structSize */sizeof(SortModifierData),
-/* type */eModifierTypeType_Nonconstructive,
-/* flags */eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode,
+	/* name */				"Sort",
+	/* structName */		"SortModifierData",
+	/* structSize */		sizeof(SortModifierData),
+	/* type */				eModifierTypeType_Nonconstructive,
+	/* flags */				eModifierTypeFlag_AcceptsMesh | 
+							eModifierTypeFlag_SupportsEditmode,
 
-/* copyData */copyData,
-/* deformVerts */NULL,
-/* deformMatrices */NULL,
-/* deformVertsEM */NULL,
-/* deformMatricesEM */NULL,
-/* applyModifier */applyModifier,
-/* applyModifierEM */applyModifierEm,
-/* initData */initData,
-/* requiredDataMask */requiredDataMask,
-/* freeData */freeData,
-/* isDisabled */isDisabled,
-/* updateDepgraph */NULL,
-/* dependsOnTime */NULL,
-/* dependsOnNormals */NULL,
-/* foreachObjectLink */NULL,
-/* foreachIDLink */NULL,
-/* foreachTexLink */NULL , };
+	/* copyData */			copyData,
+	/* deformVerts */		NULL,
+	/* deformMatrices */	NULL,
+	/* deformVertsEM */		NULL,
+	/* deformMatricesEM */	NULL,
+	/* applyModifier */		applyModifier,
+	/* applyModifierEM */	applyModifierEm,
+	/* initData */			initData,
+	/* requiredDataMask */	requiredDataMask,
+	/* freeData */			freeData,
+	/* isDisabled */		isDisabled,
+	/* updateDepgraph */	NULL,
+	/* dependsOnTime */		NULL,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */	NULL,
+	/* foreachIDLink */		NULL,
+	/* foreachTexLink */	NULL,
+};

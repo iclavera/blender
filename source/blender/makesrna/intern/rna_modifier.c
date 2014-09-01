@@ -609,8 +609,8 @@ static int rna_LaplacianDeformModifier_is_bind_get(PointerRNA *ptr)
 
 static PointerRNA rna_SortModifier_settings_get(PointerRNA *ptr)
 {
-	Object *ob = (Object *)ptr->id.data;
-	return rna_pointer_inherit_refine(ptr, &RNA_DSortSettings, ob->soft);
+	SortModifierData *smd = (SortModifierData *)ptr->data;
+	return rna_pointer_inherit_refine(ptr, &RNA_DSortSettings, smd->settings);
 }
 
 #else
@@ -3687,6 +3687,12 @@ static void rna_def_modifier_sort(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "auto_refresh", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "auto_refresh", 1);
 	RNA_def_property_ui_text(prop, "Auto Refresh", "Refresh order on mesh change");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "ui_info", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_sdna(prop, NULL, "ui_info");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "UI Info", "UI Info");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
