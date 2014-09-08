@@ -830,7 +830,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.prop(md, "material_offset_rim", text="Rim")
 
     def SORT(self, layout, ob, md):
-        is_sorted = md.is_sorted
+        is_sorted = md.is_sorted or md.initialized
         
         split = layout.split()
         col = split.column()
