@@ -166,7 +166,7 @@ static DerivedMesh *SortModifier_do(ModifierData *md, Object *ob, DerivedMesh *d
 
 	bm = DM_to_bmesh(dm, false);
 
-	BKE_dsort_bm(md, bm, smd->settings,
+	BKE_dsort_bm(md, bm, ob, smd->settings,
 					&smd->verts_order, &smd->edges_order, &smd->faces_order, NULL,
 					&smd->verts_length, &smd->edges_length, &smd->faces_length, NULL,
 					&smd->is_sorted, &smd->initiate_sort, smd->auto_refresh);

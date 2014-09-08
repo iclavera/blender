@@ -830,7 +830,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.prop(md, "material_offset_rim", text="Rim")
 
     def SORT(self, layout, ob, md):
-        is_sorted = md.is_sorted or md.initialized
+        is_sorted = md.is_sorted or md.sort_initiated
         
         split = layout.split()
         col = split.column()
@@ -854,24 +854,49 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.label(text="Sort Type:")
         col.prop(md.settings, "sort_type", text="")
         
+        print(md.settings.sort_type)
+        
         if (md.settings.sort_type == 'AXIS'):
             split = box.split()
             split.active = not is_sorted
+            
             col = split.column()
             col.label(text="Axis:")
             col = split.column()
-            col.prop(md.settings, "axis", text="")   
+            col.prop(md.settings, "axis", text="")
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'connected_first', text='Connected First')   
         elif (md.settings.sort_type == "SELECTED"):
             split = box.split()
             split.active = not is_sorted
+            
             col = split.column()
             col.prop(md.settings, 'use_original_mesh')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'connected_first', text='Connected First')
+        elif (md.settings.sort_type == "CURSOR"):
+            split = box.split()
+            split.active = not is_sorted
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'connected_first', text='Connected First')
         elif (md.settings.sort_type == "WEIGHTS"):
             split = box.split()
             split.active = not is_sorted
             col = split.column()
             col.label(text="Vertex Group:")
             col.prop_search(md.settings, "vgroup", ob, "vertex_groups", text="")
+        elif (md.settings.sort_type == "RANDOMIZE"):
+            split = box.split()
+            split.active = not is_sorted
+            
+            col = split.column()
+            col.prop(md.settings, 'random_seed')
         elif (md.settings.sort_type == "OBJECT"):
             split = box.split()
             split.active = not is_sorted
@@ -885,10 +910,6 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             col = row.column()
             if (md.settings.use_random):
                 col.prop(md.settings, "random_seed", text="Seed")
-
-        split = box.split()
-        col = split.column()    
-        col.prop(md.settings, 'connected_first', text='Connected First')
         
         split = box.split()
         split.label(text="Sort:")

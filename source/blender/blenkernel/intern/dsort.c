@@ -475,21 +475,20 @@ FloatBMElem **dsort_elems_from_selected(BMesh *bm, Object *ob, int length, const
 
 	if (use_original_mesh){
 		temp_bm = BM_mesh_create(&bm_mesh_allocsize_default);
-		BM_mesh_bm_from_me(temp_bm,(Mesh *)ob->data, false, 0, false);
+		if (!ob)
+			printf("Klops.\n");
+		if (!ob->data)
+			printf("Lups.\n");
+		BM_mesh_bm_from_me(temp_bm, (Mesh *)ob->data, false, 0, false);
 	} else
 		temp_bm = bm;
 
 	while (*coords_num == 0 && temp_bm) {
-
 		BM_ITER_MESH(elem, &iter, temp_bm, temp_mitype) {
-
 			if (dsort_bm_elem_flag_test(elem, temp_etype, BM_ELEM_SELECT)) {
-
 				if (*coords_num >= temp_coords_num) {
-
 					temp_coords_num++;
 					*coords = MEM_reallocN(*coords, sizeof(float)*3*temp_coords_num);
-
 				}
 
 				BKE_dsort_get_bm_elem_center(elem, temp_etype, (*coords)[*coords_num]);
@@ -509,25 +508,24 @@ FloatBMElem **dsort_elems_from_selected(BMesh *bm, Object *ob, int length, const
 			temp_mitype = BM_VERTS_OF_MESH;
 		}
 		else if (!use_original_mesh && *coords_num == 0) {
-			/* Nothing selected? Give it a try on not modified Mesh */
+			/* Nothing selected? Give it a try on a not modified Mesh */
 			temp_bm = BM_mesh_create(&bm_mesh_allocsize_default);
-			BM_mesh_bm_from_me(temp_bm,(Mesh *)ob->data, false, 0, false);
+			BM_mesh_bm_from_me(temp_bm, (Mesh *)ob->data, false, 0, false);
 			use_original_mesh = true;
 			temp_etype = etype;
 			temp_mitype = mitype;
 		} else
 			break;
-
 	}
 
 	if (use_original_mesh)
 		BM_mesh_free(temp_bm);
 
 	if (*coords_num == 0) {
-
 		*coords[0][0] = 0.0f;
 		*coords[0][1] = 0.0f;
 		*coords[0][2] = 0.0f;
+
 		*coords_num += 1;
 	}
 
@@ -625,7 +623,7 @@ FloatBMElem *dsort_elems_none(BMesh *bm, int length, int mitype)
 	return distances;
 }
 
-void dsort_elems(ModifierData *md,BMesh *bm, DSortSettings *settings,
+void dsort_elems(ModifierData *md, BMesh *bm, Object *ob, DSortSettings *settings,
 				int **p_elems_order, int length,
 				const char etype, int mitype, int itype, int iitype)
 {
@@ -643,7 +641,7 @@ void dsort_elems(ModifierData *md,BMesh *bm, DSortSettings *settings,
 		if (settings->coords != NULL)
 			m_distances = dsort_elems_from_coords(bm, length, etype, mitype, settings->coords, settings->coords_num);
 		else
-			m_distances = dsort_elems_from_selected(bm, settings->object, length, etype, mitype, &settings->coords, &settings->coords_num, settings->use_original_mesh);
+			m_distances = dsort_elems_from_selected(bm, ob, length, etype, mitype, &settings->coords, &settings->coords_num, settings->use_original_mesh);
 		distances_num = settings->coords_num;
 	} else if (settings->sort_type == DSORT_TYPE_CURSOR) {
 		if (settings->coords != NULL)
@@ -654,7 +652,7 @@ void dsort_elems(ModifierData *md,BMesh *bm, DSortSettings *settings,
 		}
 		distances_num = settings->coords_num;
 	} else if (settings->sort_type == DSORT_TYPE_WEIGHTS) {
-		s_distances = dsort_elems_from_weights(bm, length, etype, mitype, itype, settings->object, settings->vgroup);
+		s_distances = dsort_elems_from_weights(bm, length, etype, mitype, itype, ob, settings->vgroup);
 		distances_num = 1;
 	} else if (settings->sort_type == DSORT_TYPE_RANDOM) {
 		s_distances = dsort_elems_randomize(bm, length, mitype, settings->random_seed);
@@ -765,11 +763,11 @@ void dsort_reverse_order(int *elems_order, int length)
 	}
 }
 
-void BKE_dsort_set_elems_order(ModifierData *md, BMesh *bm, DSortSettings *settings,
+void BKE_dsort_set_elems_order(ModifierData *md, BMesh *bm, Object *ob, DSortSettings *settings,
 								int **p_verts_order, int **p_edges_order, int **p_faces_order)
 {
 	if (settings->sort_elems & DSORT_ELEMS_VERTS) {
-		dsort_elems(md, bm, settings,
+		dsort_elems(md, bm, ob, settings,
 					p_verts_order, bm->totvert,
 					BM_VERT, BM_VERTS_OF_MESH, BM_EDGES_OF_VERT, BM_VERTS_OF_EDGE);
 	}
@@ -779,7 +777,7 @@ void BKE_dsort_set_elems_order(ModifierData *md, BMesh *bm, DSortSettings *setti
 		if (*p_verts_order)
 			dsort_edges_from_verts(bm, p_edges_order, *p_verts_order);
 		else {
-			dsort_elems(md, bm, settings,
+			dsort_elems(md, bm, ob, settings,
 						p_edges_order, bm->totedge,
 						BM_EDGE, BM_EDGES_OF_MESH, BM_VERTS_OF_EDGE, BM_EDGES_OF_VERT);
 		}
@@ -792,7 +790,7 @@ void BKE_dsort_set_elems_order(ModifierData *md, BMesh *bm, DSortSettings *setti
 		else if (*p_edges_order)
 			dsort_edges_from_verts(bm, p_faces_order, *p_edges_order);
 		else {
-			dsort_elems(md, bm, settings,
+			dsort_elems(md, bm, ob, settings,
 						p_faces_order, bm->totface,
 						BM_FACE, BM_FACES_OF_MESH, BM_VERTS_OF_FACE, BM_FACES_OF_VERT);
 		}
@@ -847,7 +845,7 @@ void BKE_dsort_free_data(DSortSettings *settings,
 	*initiate_sort = false;
 }
 
-char BKE_dsort_bm(ModifierData *md, BMesh *bm, DSortSettings *settings,
+char BKE_dsort_bm(ModifierData *md, BMesh *bm, Object *ob, DSortSettings *settings,
 					int **p_verts_order, int **p_edges_order, int **p_faces_order, int **p_loops_order,
 					int *p_verts_length, int *p_edges_length, int *p_faces_length, int *p_loops_length,
 					short *is_sorted, short *initiate_sort, short auto_refresh)
@@ -890,8 +888,8 @@ char BKE_dsort_bm(ModifierData *md, BMesh *bm, DSortSettings *settings,
 		*p_edges_order = NULL;
 		*p_faces_order = NULL;
 
-		BKE_dsort_set_elems_order((ModifierData *)md, bm, settings,
-			p_verts_order, p_edges_order, p_faces_order);
+		BKE_dsort_set_elems_order((ModifierData *)md, bm, ob, settings,
+									p_verts_order, p_edges_order, p_faces_order);
 
 		if (*p_verts_order) {
 			*p_verts_length = bm->totvert;
