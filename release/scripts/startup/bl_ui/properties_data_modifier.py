@@ -867,7 +867,11 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             
             split = box.split()
             col = split.column()    
-            col.prop(md.settings, 'connected_first', text='Connected First')   
+            col.prop(md.settings, 'connected_first', text='Connected First')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')      
         elif (md.settings.sort_type == "SELECTED"):
             split = box.split()
             split.active = not is_sorted
@@ -878,6 +882,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             split = box.split()
             col = split.column()    
             col.prop(md.settings, 'connected_first', text='Connected First')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
         elif (md.settings.sort_type == "CURSOR"):
             split = box.split()
             split.active = not is_sorted
@@ -885,12 +893,21 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             split = box.split()
             col = split.column()    
             col.prop(md.settings, 'connected_first', text='Connected First')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
         elif (md.settings.sort_type == "WEIGHTS"):
             split = box.split()
             split.active = not is_sorted
+            
             col = split.column()
             col.label(text="Vertex Group:")
             col.prop_search(md.settings, "vgroup", ob, "vertex_groups", text="")
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
         elif (md.settings.sort_type == "RANDOMIZE"):
             split = box.split()
             split.active = not is_sorted
@@ -900,16 +917,23 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         elif (md.settings.sort_type == "OBJECT"):
             split = box.split()
             split.active = not is_sorted
+            
             col = split.column()
             row = col.row()
             row.label(text="Object:")
             row.prop(md.settings, "target_object", text="")
+            
             row = col.row()
             col = row.column()
             col.prop(md.settings, "use_random", text="Randomize")
+            
             col = row.column()
             if (md.settings.use_random):
                 col.prop(md.settings, "random_seed", text="Seed")
+                
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
         
         split = box.split()
         split.label(text="Sort:")

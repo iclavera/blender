@@ -182,6 +182,11 @@ static int object_dsort_free_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
+	if (!smd->is_sorted) {
+		BKE_report(op->reports, RPT_ERROR, "Sort data has already been freed.");
+		return OPERATOR_CANCELLED;
+	}
+
 	/* Freeing dsort data */
 	BKE_dsort_free_data(smd->settings,
 						&smd->verts_order, &smd->edges_order, &smd->faces_order,
