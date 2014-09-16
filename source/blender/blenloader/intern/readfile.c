@@ -100,6 +100,7 @@
 #include "DNA_world_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_mask_types.h"
+#include "DNA_dsort_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -4736,19 +4737,6 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				BLI_endian_switch_int32_array(hmd->indexar, hmd->totindex);
 			}
 		}
-		else if (md->type == eModifierType_ParticleSystem) {
-			ParticleSystemModifierData *psmd = (ParticleSystemModifierData *)md;
-			
-			psmd->dm= NULL;
-			psmd->psys= newdataadr(fd, psmd->psys);
-			psmd->flag &= ~eParticleSystemFlag_psys_updated;
-			psmd->flag |= eParticleSystemFlag_file_loaded;
-		}
-		else if (md->type == eModifierType_Explode) {
-			ExplodeModifierData *psmd = (ExplodeModifierData *)md;
-			
-			psmd->facepa = NULL;
-		}
 		else if (md->type == eModifierType_MeshDeform) {
 			MeshDeformModifierData *mmd = (MeshDeformModifierData *)md;
 			
@@ -4798,6 +4786,26 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				BLI_endian_switch_float_array(lmd->vertexco, lmd->total_verts * 3);
 			}
 			lmd->cache_system = NULL;
+		}
+        else if (md->type == eModifierType_Sort) {
+			SortModifierData *smd = (SortModifierData *)md;
+
+			smd->verts_order = newdataadr(fd, smd->verts_order);
+			if (fd->flags & FD_FLAGS_SWITCH_ENDIAN)
+				BLI_endian_switch_int32_array(smd->verts_order, smd->verts_length);
+
+			smd->edges_order = newdataadr(fd, smd->edges_order);
+			if (fd->flags & FD_FLAGS_SWITCH_ENDIAN)
+				BLI_endian_switch_int32_array(smd->edges_order, smd->edges_length);
+
+			smd->faces_order = newdataadr(fd, smd->faces_order);
+			if (fd->flags & FD_FLAGS_SWITCH_ENDIAN)
+				BLI_endian_switch_int32_array(smd->faces_order, smd->faces_length);
+
+			smd->settings = newdataadr(fd, smd->settings);
+			smd->settings->coords = newdataadr(fd, smd->settings->coords);
+			if (fd->flags & FD_FLAGS_SWITCH_ENDIAN)
+				BLI_endian_switch_float_array(smd->settings->coords, smd->settings->coords_num * 3);
 		}
 	}
 }

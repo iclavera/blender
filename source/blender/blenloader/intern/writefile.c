@@ -138,6 +138,7 @@
 #include "DNA_windowmanager_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_mask_types.h"
+#include "DNA_dsort_types.h"
 
 #include "MEM_guardedalloc.h" // MEM_freeN
 #include "BLI_bitmap.h"
@@ -1474,6 +1475,16 @@ static void write_modifiers(WriteData *wd, ListBase *modbase)
 			LaplacianDeformModifierData *lmd = (LaplacianDeformModifierData*) md;
 
 			writedata(wd, DATA, sizeof(float)*lmd->total_verts * 3, lmd->vertexco);
+		}
+        else if (md->type==eModifierType_Sort) {
+			SortModifierData *smd = (SortModifierData*) md;
+
+			writedata(wd, DATA, sizeof(int)*smd->verts_length, smd->verts_order);
+			writedata(wd, DATA, sizeof(int)*smd->edges_length, smd->edges_order);
+			writedata(wd, DATA, sizeof(int)*smd->faces_length, smd->faces_order);
+
+			writestruct(wd, DATA, "DSortSettings", 1, smd->settings);
+			writedata(wd, DATA, sizeof(float)*3*smd->settings->coords_num, smd->settings->coords);
 		}
 	}
 }

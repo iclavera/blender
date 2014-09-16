@@ -830,6 +830,141 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.active = md.use_rim
         row.prop(md, "material_offset_rim", text="Rim")
 
+    def SORT(self, layout, ob, md):
+        is_sorted = md.is_sorted or md.sort_initiated
+        
+        split = layout.split()
+        col = split.column()
+        if (md.ui_info == 0):
+            col.label(text='No elements were sorted.')
+        else:
+            info_text = "Sorted elements: "
+            if (md.ui_info & 1):
+                info_text += "verts, "
+            if (md.ui_info & 2):
+                info_text += "edges, "
+            if (md.ui_info & 4):
+                info_text += "faces"
+            col.label(text=info_text)
+        
+        box = layout.box()
+        box.active = not is_sorted
+        
+        split = box.split()
+        col = split.column()
+        col.label(text="Sort Type:")
+        col.prop(md.settings, "sort_type", text="")
+        
+        print(md.settings.sort_type)
+        
+        if (md.settings.sort_type == 'AXIS'):
+            split = box.split()
+            split.active = not is_sorted
+            
+            col = split.column()
+            col.label(text="Axis:")
+            col = split.column()
+            col.prop(md.settings, "axis", text="")
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'connected_first', text='Connected First')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')      
+        elif (md.settings.sort_type == "SELECTED"):
+            split = box.split()
+            split.active = not is_sorted
+            
+            col = split.column()
+            col.prop(md.settings, 'use_original_mesh')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'connected_first', text='Connected First')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
+        elif (md.settings.sort_type == "CURSOR"):
+            split = box.split()
+            split.active = not is_sorted
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'connected_first', text='Connected First')
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
+        elif (md.settings.sort_type == "WEIGHTS"):
+            split = box.split()
+            split.active = not is_sorted
+            
+            col = split.column()
+            col.label(text="Vertex Group:")
+            col.prop_search(md.settings, "vgroup", ob, "vertex_groups", text="")
+            
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
+        elif (md.settings.sort_type == "RANDOMIZE"):
+            split = box.split()
+            split.active = not is_sorted
+            
+            col = split.column()
+            col.prop(md.settings, 'random_seed')
+        elif (md.settings.sort_type == "OBJECT"):
+            split = box.split()
+            split.active = not is_sorted
+            
+            col = split.column()
+            row = col.row()
+            row.label(text="Object:")
+            row.prop(md.settings, "target_object", text="")
+            
+            row = col.row()
+            col = row.column()
+            col.prop(md.settings, "use_random", text="Randomize")
+            
+            col = row.column()
+            if (md.settings.use_random):
+                col.prop(md.settings, "random_seed", text="Seed")
+                
+            split = box.split()
+            col = split.column()    
+            col.prop(md.settings, 'reverse', text='Reverse')
+        
+        split = box.split()
+        split.label(text="Sort:")
+        
+        split = box.split()
+        col = split.column()
+        col.prop(md.settings, 'sort_faces', text='Faces')
+        col = split.column()
+        col.prop(md.settings, 'sort_verts', text='Verts')
+        
+        split = box.split()
+        col = split.column()
+        col.prop(md.settings, 'sort_edges', text='Edges')
+        col = split.column()
+        
+        
+        split = layout.split()
+        col = split.column()
+        col.active = is_sorted
+        col.operator("object.dsort_free", text="Free")
+        col = split.column()
+        col.active = not is_sorted
+        col.operator("object.dsort", text="Sort")
+        
+        split = layout.split()
+        split.active = True 
+        col = split.column()
+        col.active = True
+        col.prop(md, 'auto_refresh')
+        
     def SUBSURF(self, layout, ob, md):
         layout.row().prop(md, "subdivision_type", expand=True)
 
